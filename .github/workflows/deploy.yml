@@ -1,4 +1,4 @@
-name: Deploy to Ubuntu (PM2 dev)
+name: Deploy backend
 
 on:
   push:
