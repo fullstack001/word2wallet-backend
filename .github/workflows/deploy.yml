@@ -1,0 +1,39 @@
+name: Deploy to Ubuntu (PM2 dev)
+
+on:
+  push:
+    branches:
+      - main # or 'dev'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout (just for version/metadata)
+        uses: actions/checkout@v4
+
+      - name: SSH into server and deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            set -e
+            cd /var/www/word2wallet-backend
+            # Ensure correct Node version if using nvm
+            if [ -s "$HOME/.nvm/nvm.sh" ]; then . "$HOME/.nvm/nvm.sh"; fi
+            nvm use --lts >/dev/null 2>&1 || true
+
+            # Pull latest code
+            git pull
+
+            # Install deps (ci for reproducible; fallback to install)
+            npm install
+
+
+
+            # Restart PM2 process
+            pm2 restart all
