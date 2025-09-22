@@ -161,6 +161,28 @@ const courseSchema = new Schema<ICourse>(
       type: Boolean,
       default: false,
     },
+    googleDocLink: {
+      type: String,
+      trim: true,
+      validate: {
+        validator: function (v: string) {
+          if (!v) return true; // Allow empty
+          return /^https:\/\/docs\.google\.com\//.test(v);
+        },
+        message: "Google Doc link must be a valid Google Docs URL",
+      },
+    },
+    googleClassroomLink: {
+      type: String,
+      trim: true,
+      validate: {
+        validator: function (v: string) {
+          if (!v) return true; // Allow empty
+          return /^https:\/\/classroom\.google\.com\//.test(v);
+        },
+        message: "Google Classroom link must be a valid Google Classroom URL",
+      },
+    },
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: "User",

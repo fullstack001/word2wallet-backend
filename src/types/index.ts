@@ -62,6 +62,8 @@ export interface ICourse extends Document {
   multimediaContent?: MultimediaContent;
   isActive: boolean;
   isPublished: boolean;
+  googleDocLink?: string;
+  googleClassroomLink?: string;
   createdBy: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;

@@ -200,8 +200,16 @@ export class CourseController {
         });
       }
 
-      const { title, description, subject, chapters, isPublished, isActive } =
-        req.body;
+      const {
+        title,
+        description,
+        subject,
+        chapters,
+        isPublished,
+        isActive,
+        googleDocLink,
+        googleClassroomLink,
+      } = req.body;
       const user = req.user!;
 
       // Parse chapters if it's a JSON string (from FormData)
@@ -298,6 +306,8 @@ export class CourseController {
         multimediaContent: multimediaFiles,
         isPublished: isPublished || false,
         isActive: isActive !== undefined ? isActive : true,
+        googleDocLink: googleDocLink || undefined,
+        googleClassroomLink: googleClassroomLink || undefined,
         createdBy: user._id,
       };
 
@@ -390,6 +400,8 @@ export class CourseController {
         isPublished,
         isActive,
         removeExistingCover,
+        googleDocLink,
+        googleClassroomLink,
       } = req.body;
 
       const course = await Course.findById(id);
@@ -574,6 +586,9 @@ export class CourseController {
         updates.multimediaContent = finalMultimediaContent;
       if (isPublished !== undefined) updates.isPublished = isPublished;
       if (isActive !== undefined) updates.isActive = isActive;
+      if (googleDocLink !== undefined) updates.googleDocLink = googleDocLink;
+      if (googleClassroomLink !== undefined)
+        updates.googleClassroomLink = googleClassroomLink;
 
       const updatedCourse = await Course.findByIdAndUpdate(id, updates, {
         new: true,
