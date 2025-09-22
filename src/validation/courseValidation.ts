@@ -22,6 +22,28 @@ export const createCourseValidation = [
     .optional()
     .isBoolean()
     .withMessage("isActive must be a boolean value"),
+  body("googleDocLink")
+    .optional()
+    .custom((value) => {
+      if (value && value.trim() !== "") {
+        if (!value.startsWith("https://docs.google.com/")) {
+          throw new Error("Google Doc link must be a valid Google Docs URL");
+        }
+      }
+      return true;
+    }),
+  body("googleClassroomLink")
+    .optional()
+    .custom((value) => {
+      if (value && value.trim() !== "") {
+        if (!value.startsWith("https://classroom.google.com/")) {
+          throw new Error(
+            "Google Classroom link must be a valid Google Classroom URL"
+          );
+        }
+      }
+      return true;
+    }),
 ];
 
 // Update course validation rules
@@ -67,6 +89,28 @@ export const updateCourseValidation = [
     .optional()
     .isBoolean()
     .withMessage("isActive must be a boolean value"),
+  body("googleDocLink")
+    .optional()
+    .custom((value) => {
+      if (value && value.trim() !== "") {
+        if (!value.startsWith("https://docs.google.com/")) {
+          throw new Error("Google Doc link must be a valid Google Docs URL");
+        }
+      }
+      return true;
+    }),
+  body("googleClassroomLink")
+    .optional()
+    .custom((value) => {
+      if (value && value.trim() !== "") {
+        if (!value.startsWith("https://classroom.google.com/")) {
+          throw new Error(
+            "Google Classroom link must be a valid Google Classroom URL"
+          );
+        }
+      }
+      return true;
+    }),
 ];
 
 // Course ID validation rules

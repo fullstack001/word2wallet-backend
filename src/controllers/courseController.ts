@@ -586,9 +586,10 @@ export class CourseController {
         updates.multimediaContent = finalMultimediaContent;
       if (isPublished !== undefined) updates.isPublished = isPublished;
       if (isActive !== undefined) updates.isActive = isActive;
-      if (googleDocLink !== undefined) updates.googleDocLink = googleDocLink;
+      if (googleDocLink !== undefined)
+        updates.googleDocLink = googleDocLink || null;
       if (googleClassroomLink !== undefined)
-        updates.googleClassroomLink = googleClassroomLink;
+        updates.googleClassroomLink = googleClassroomLink || null;
 
       const updatedCourse = await Course.findByIdAndUpdate(id, updates, {
         new: true,
