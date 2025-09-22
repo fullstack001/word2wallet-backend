@@ -10,6 +10,12 @@ const subjectSchema = new Schema<ISubject>(
       maxlength: [100, "Subject name cannot exceed 100 characters"],
       unique: true,
     },
+    slug: {
+      type: String,
+      unique: true,
+      sparse: true, // This allows multiple null values
+      trim: true,
+    },
     description: {
       type: String,
       required: [true, "Subject description is required"],
@@ -33,6 +39,20 @@ const subjectSchema = new Schema<ISubject>(
   }
 );
 
+// Pre-save middleware to generate slug from name
+subjectSchema.pre<ISubject>("save", function (next) {
+  if (this.isModified("name") && !this.slug) {
+    // Generate slug from name
+    this.slug = this.name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, "") // Remove special characters
+      .replace(/\s+/g, "-") // Replace spaces with hyphens
+      .replace(/-+/g, "-") // Replace multiple hyphens with single hyphen
+      .replace(/^-+|-+$/g, ""); // Remove leading/trailing hyphens
+  }
+  next();
+});
+
 // Virtual for course count
 subjectSchema.virtual("courseCount", {
   ref: "Course",
@@ -43,6 +63,7 @@ subjectSchema.virtual("courseCount", {
 
 // Indexes for better query performance
 subjectSchema.index({ name: 1 });
+subjectSchema.index({ slug: 1 });
 subjectSchema.index({ isActive: 1 });
 subjectSchema.index({ createdBy: 1 });
 

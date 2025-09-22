@@ -20,6 +20,7 @@ router.get(
   idValidation,
   SubjectController.getSubjectById
 );
+router.get("/:slug", authenticate, SubjectController.getSubjectBySlug);
 
 // Admin routes
 router.post(

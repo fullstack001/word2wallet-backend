@@ -28,6 +28,7 @@ export enum UserRole {
 export interface ISubject extends Document {
   _id: string;
   name: string;
+  slug?: string;
   description: string;
   isActive: boolean;
   createdBy: mongoose.Types.ObjectId;

@@ -118,6 +118,39 @@ export class SubjectController {
   }
 
   /**
+   * Get subject by slug
+   */
+  static async getSubjectBySlug(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const { slug } = req.params;
+
+      const subject = await Subject.findOne({ slug }).populate(
+        "createdBy",
+        "firstName lastName email"
+      );
+
+      if (!subject) {
+        return res.status(404).json({
+          success: false,
+          message: "Subject not found",
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "Subject retrieved successfully",
+        data: subject,
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  /**
    * Create new subject (Admin only)
    */
   static async createSubject(
