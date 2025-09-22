@@ -1,22 +1,26 @@
 import { Router } from "express";
 import { CourseController } from "../controllers/courseController";
 import { authenticate, requireAdmin } from "../middleware/auth";
-import {
-  uploadEpub,
-  uploadThumbnail,
-  handleUploadError,
-} from "../middleware/upload";
+import { uploadCourseContent, handleUploadError } from "../middleware/upload";
 import {
   createCourseValidation,
   updateCourseValidation,
   courseIdValidation,
+  multimediaFileValidation,
 } from "../validation";
 
 const router = Router();
 
 // Public routes
 router.get("/published", CourseController.getPublishedCourses);
+router.get("/:id/epub", courseIdValidation, CourseController.serveEpub);
 router.get("/:id/download", courseIdValidation, CourseController.downloadEpub);
+router.get("/:id/cover", courseIdValidation, CourseController.serveCoverImage);
+router.get(
+  "/:id/multimedia/:type/:filename",
+  courseIdValidation,
+  CourseController.serveMultimediaFile
+);
 
 // Protected routes (require authentication)
 router.get("/", authenticate, CourseController.getCourses);
@@ -32,6 +36,12 @@ router.post(
   "/",
   authenticate,
   requireAdmin,
+  uploadCourseContent.fields([
+    { name: "cover", maxCount: 1 },
+    { name: "audio", maxCount: 10 },
+    { name: "video", maxCount: 10 },
+  ]),
+  handleUploadError,
   createCourseValidation,
   CourseController.createCourse
 );
@@ -39,6 +49,12 @@ router.put(
   "/:id",
   authenticate,
   requireAdmin,
+  uploadCourseContent.fields([
+    { name: "epubCover", maxCount: 1 },
+    { name: "audio", maxCount: 10 },
+    { name: "video", maxCount: 10 },
+  ]),
+  handleUploadError,
   courseIdValidation,
   updateCourseValidation,
   CourseController.updateCourse
@@ -58,25 +74,14 @@ router.patch(
   CourseController.togglePublishedStatus
 );
 
-// File upload routes (Admin only)
-router.post(
-  "/:id/upload-epub",
-  authenticate,
-  requireAdmin,
-  courseIdValidation,
-  uploadEpub.single("epub"),
-  handleUploadError,
-  CourseController.uploadEpub
-);
+// Individual multimedia file management (Admin only)
 
-router.post(
-  "/:id/upload-thumbnail",
+router.delete(
+  "/:id/multimedia/:type/:fileId",
   authenticate,
   requireAdmin,
-  courseIdValidation,
-  uploadThumbnail.single("thumbnail"),
-  handleUploadError,
-  CourseController.uploadThumbnail
+  multimediaFileValidation,
+  CourseController.removeMultimediaFile
 );
 
 export default router;

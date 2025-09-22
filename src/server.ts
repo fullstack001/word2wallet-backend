@@ -49,13 +49,46 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// CORS configuration
+// Manual CORS headers for development
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+  );
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, Range, Accept, Origin, X-Requested-With"
+  );
+  res.header(
+    "Access-Control-Expose-Headers",
+    "Content-Range, Content-Length, Accept-Ranges"
+  );
+
+  if (req.method === "OPTIONS") {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
+
+// CORS configuration - More permissive for development
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://127.0.0.1:3065",
+    origin: true, // Allow all origins in development
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Range",
+      "Accept",
+      "Origin",
+      "X-Requested-With",
+    ],
+    exposedHeaders: ["Content-Range", "Content-Length", "Accept-Ranges"],
+    preflightContinue: false,
+    optionsSuccessStatus: 200,
   })
 );
 

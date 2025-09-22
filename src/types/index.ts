@@ -39,15 +39,25 @@ export interface ISubjectModel extends mongoose.Model<ISubject> {
   findActive(): mongoose.Query<ISubject[], ISubject>;
 }
 
+// Chapter Types
+export interface IChapter {
+  id: string;
+  title: string;
+  description: string;
+  content: string;
+}
+
 // Course Types
 export interface ICourse extends Document {
   _id: string;
   title: string;
+  slug?: string;
   description: string;
   subject: mongoose.Types.ObjectId; // Subject ID
   epubFile?: string; // File path
   epubMetadata?: EpubMetadata;
-  thumbnail?: string;
+  epubCover?: string; // Cover image path
+  chapters: IChapter[];
   multimediaContent?: MultimediaContent;
   isActive: boolean;
   isPublished: boolean;

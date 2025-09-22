@@ -2,10 +2,35 @@ import mongoose, { Schema } from "mongoose";
 import {
   ICourse,
   ICourseModel,
+  IChapter,
   EpubMetadata,
   MultimediaContent,
   MediaFile,
 } from "../types";
+
+const chapterSchema = new Schema<IChapter>(
+  {
+    id: {
+      type: String,
+      required: true,
+    },
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    description: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    content: {
+      type: String,
+      required: true,
+    },
+  },
+  { _id: false }
+);
 
 const epubMetadataSchema = new Schema<EpubMetadata>(
   {
@@ -98,6 +123,12 @@ const courseSchema = new Schema<ICourse>(
       trim: true,
       maxlength: [200, "Title cannot exceed 200 characters"],
     },
+    slug: {
+      type: String,
+      unique: true,
+      sparse: true, // This allows multiple null values
+      trim: true,
+    },
     description: {
       type: String,
       required: [true, "Course description is required"],
@@ -115,9 +146,10 @@ const courseSchema = new Schema<ICourse>(
     epubMetadata: {
       type: epubMetadataSchema,
     },
-    thumbnail: {
-      type: String, // Path to thumbnail image
+    epubCover: {
+      type: String, // Path to cover image
     },
+    chapters: [chapterSchema],
     multimediaContent: {
       type: multimediaContentSchema,
     },
@@ -142,8 +174,23 @@ const courseSchema = new Schema<ICourse>(
   }
 );
 
+// Pre-save middleware to generate slug from title
+courseSchema.pre<ICourse>("save", function (next) {
+  if (this.isModified("title") && !this.slug) {
+    // Generate slug from title
+    this.slug = this.title
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, "") // Remove special characters
+      .replace(/\s+/g, "-") // Replace spaces with hyphens
+      .replace(/-+/g, "-") // Replace multiple hyphens with single hyphen
+      .replace(/^-+|-+$/g, ""); // Remove leading/trailing hyphens
+  }
+  next();
+});
+
 // Indexes for better query performance
 courseSchema.index({ title: 1 });
+courseSchema.index({ slug: 1 }, { unique: true, sparse: true });
 courseSchema.index({ subject: 1 });
 courseSchema.index({ isActive: 1 });
 courseSchema.index({ isPublished: 1 });
@@ -177,9 +224,8 @@ courseSchema.statics.search = function (query: string) {
 };
 
 // Virtual for course URL
-courseSchema.virtual("url").get(function () {
-  const course = this as ICourse;
-  return `/api/courses/${course._id}`;
+courseSchema.virtual<ICourse>("url").get(function () {
+  return `/api/courses/${this._id}`;
 });
 
 export const Course = mongoose.model<ICourse, ICourseModel>(

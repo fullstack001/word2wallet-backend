@@ -3,7 +3,8 @@ import { validationResult } from "express-validator";
 import { Course } from "../models/Course";
 import { Subject } from "../models/Subject";
 import { CustomError } from "../middleware/errorHandler";
-import { AuthRequest, CourseQuery } from "../types";
+import { AuthRequest, CourseQuery, IChapter } from "../types";
+import { EpubGenerator } from "../utils/epubGenerator";
 import fs from "fs";
 import path from "path";
 
@@ -180,7 +181,8 @@ export class CourseController {
   }
 
   /**
-   * Create new course (Admin only)
+   * Create new course with all content (Admin only)
+   * Handles: course creation, cover upload, multimedia uploads, EPUB generation
    */
   static async createCourse(
     req: AuthRequest,
@@ -198,8 +200,72 @@ export class CourseController {
         });
       }
 
-      const { title, description, subject, isPublished } = req.body;
+      const { title, description, subject, chapters, isPublished, isActive } =
+        req.body;
       const user = req.user!;
+
+      // Parse chapters if it's a JSON string (from FormData)
+      let parsedChapters = [];
+      if (chapters) {
+        if (typeof chapters === "string") {
+          try {
+            parsedChapters = JSON.parse(chapters);
+          } catch (error) {
+            return res.status(400).json({
+              success: false,
+              message: "Invalid chapters format",
+            });
+          }
+        } else {
+          parsedChapters = chapters;
+        }
+      }
+
+      // Handle cover image upload if present
+      let coverImagePath = null;
+      if (
+        req.files &&
+        typeof req.files === "object" &&
+        "cover" in req.files &&
+        req.files.cover &&
+        req.files.cover[0]
+      ) {
+        coverImagePath = req.files.cover[0].path;
+        console.log("📸 Cover image uploaded:", coverImagePath);
+      } else {
+        console.log("📸 No cover image provided");
+        console.log("📸 req.files:", req.files);
+        console.log("📸 req.file:", req.file);
+      }
+
+      // Handle multimedia files if present
+      let multimediaFiles: any = { audio: [], video: [] };
+      if (req.files) {
+        const files = Array.isArray(req.files)
+          ? req.files
+          : Object.values(req.files).flat();
+
+        files.forEach((file: any) => {
+          const fileData = {
+            id: `${file.fieldname}-${Date.now()}-${Math.random()
+              .toString(36)
+              .substr(2, 9)}`,
+            filename: file.filename,
+            originalName: file.originalname,
+            mimeType: file.mimetype,
+            size: file.size,
+            path: file.path,
+            url: `/uploads/${file.fieldname}/${file.filename}`,
+            uploadedAt: new Date(),
+          };
+
+          if (file.fieldname === "audio") {
+            multimediaFiles.audio.push(fileData);
+          } else if (file.fieldname === "video") {
+            multimediaFiles.video.push(fileData);
+          }
+        });
+      }
 
       // Verify subject exists
       const subjectExists = await Subject.findById(subject);
@@ -222,15 +288,65 @@ export class CourseController {
         });
       }
 
-      const course = new Course({
+      // Create course
+      const courseData = {
         title,
         description,
         subject,
+        chapters: parsedChapters,
+        epubCover: coverImagePath,
+        multimediaContent: multimediaFiles,
         isPublished: isPublished || false,
+        isActive: isActive !== undefined ? isActive : true,
         createdBy: user._id,
-      });
+      };
 
+      console.log("🏗️ Creating course with data:");
+      console.log("- epubCover:", courseData.epubCover);
+      console.log("- Full course data:", JSON.stringify(courseData, null, 2));
+
+      const course = new Course(courseData);
       await course.save();
+
+      console.log("✅ Course saved with ID:", course._id);
+      console.log("✅ Course epubCover in DB:", course.epubCover);
+
+      // Generate EPUB file
+      try {
+        const epubPath = path.join(
+          process.cwd(),
+          "uploads",
+          "epubs",
+          `${course._id}.epub`
+        );
+
+        await EpubGenerator.generateEpub({
+          title: course.title,
+          description: course.description,
+          author: `${user.firstName} ${user.lastName}`,
+          coverImagePath: course.epubCover,
+          chapters: course.chapters,
+          outputPath: epubPath,
+        });
+
+        // Update course with EPUB file path
+        course.epubFile = `uploads/epubs/${course._id}.epub`;
+        course.epubMetadata = {
+          title: course.title,
+          author: `${user.firstName} ${user.lastName}`,
+          language: "en",
+          description: course.description,
+          coverImage: course.epubCover,
+          fileSize: fs.existsSync(epubPath) ? fs.statSync(epubPath).size : 0,
+          lastModified: new Date(),
+        };
+
+        await course.save();
+      } catch (epubError) {
+        console.error("EPUB generation failed:", epubError);
+        // Continue without EPUB file - it can be generated later
+      }
+
       await course.populate("subject", "name slug");
       await course.populate("createdBy", "firstName lastName email");
 
@@ -246,6 +362,7 @@ export class CourseController {
 
   /**
    * Update course (Admin only)
+   * Handles: course updates, cover upload, multimedia uploads, EPUB regeneration
    */
   static async updateCourse(
     req: AuthRequest,
@@ -264,7 +381,16 @@ export class CourseController {
       }
 
       const { id } = req.params;
-      const { title, description, subject, isPublished, isActive } = req.body;
+      const {
+        title,
+        description,
+        subject,
+        chapters,
+        multimediaContent,
+        isPublished,
+        isActive,
+        removeExistingCover,
+      } = req.body;
 
       const course = await Course.findById(id);
       if (!course) {
@@ -272,6 +398,40 @@ export class CourseController {
           success: false,
           message: "Course not found",
         });
+      }
+
+      // Parse chapters if it's a JSON string (from FormData)
+      let parsedChapters = course.chapters;
+      if (chapters) {
+        if (typeof chapters === "string") {
+          try {
+            parsedChapters = JSON.parse(chapters);
+          } catch (error) {
+            return res.status(400).json({
+              success: false,
+              message: "Invalid chapters format",
+            });
+          }
+        } else {
+          parsedChapters = chapters;
+        }
+      }
+
+      // Parse multimediaContent if it's a JSON string (from FormData)
+      let parsedMultimediaContent = course.multimediaContent;
+      if (multimediaContent) {
+        if (typeof multimediaContent === "string") {
+          try {
+            parsedMultimediaContent = JSON.parse(multimediaContent);
+          } catch (error) {
+            return res.status(400).json({
+              success: false,
+              message: "Invalid multimedia content format",
+            });
+          }
+        } else {
+          parsedMultimediaContent = multimediaContent;
+        }
       }
 
       // Verify subject exists if provided
@@ -300,11 +460,118 @@ export class CourseController {
         }
       }
 
+      // Validate chapters if provided
+      if (parsedChapters && parsedChapters !== course.chapters) {
+        if (!Array.isArray(parsedChapters) || parsedChapters.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: "At least one chapter is required",
+          });
+        }
+
+        for (const chapter of parsedChapters) {
+          if (!chapter.title || !chapter.description || !chapter.content) {
+            return res.status(400).json({
+              success: false,
+              message: "Each chapter must have title, description, and content",
+            });
+          }
+        }
+      }
+
+      // Handle cover image upload if present
+      let coverImagePath: string | undefined = course.epubCover;
+
+      // Check if existing cover should be removed
+      if (removeExistingCover === "true" || removeExistingCover === true) {
+        if (
+          course.epubCover &&
+          fs.existsSync(path.join(process.cwd(), course.epubCover))
+        ) {
+          fs.unlinkSync(path.join(process.cwd(), course.epubCover));
+          console.log("🗑️ Removed existing cover image:", course.epubCover);
+        }
+        coverImagePath = undefined;
+      }
+
+      // Handle new cover image upload
+      if (
+        req.files &&
+        typeof req.files === "object" &&
+        "epubCover" in req.files &&
+        req.files.epubCover &&
+        req.files.epubCover[0]
+      ) {
+        // Delete old cover if exists
+        if (
+          course.epubCover &&
+          fs.existsSync(path.join(process.cwd(), course.epubCover))
+        ) {
+          fs.unlinkSync(path.join(process.cwd(), course.epubCover));
+        }
+        coverImagePath = req.files.epubCover[0].path;
+        console.log("📸 Cover image updated:", coverImagePath);
+      }
+
+      // Handle new multimedia files if present
+      let newMultimediaFiles: any = { audio: [], video: [] };
+      if (req.files) {
+        const files = Array.isArray(req.files)
+          ? req.files
+          : Object.values(req.files).flat();
+
+        files.forEach((file: any) => {
+          const fileData = {
+            id: `${file.fieldname}-${Date.now()}-${Math.random()
+              .toString(36)
+              .substr(2, 9)}`,
+            filename: file.filename,
+            originalName: file.originalname,
+            mimeType: file.mimetype,
+            size: file.size,
+            path: file.path,
+            url: `/uploads/${file.fieldname}/${file.filename}`,
+            uploadedAt: new Date(),
+          };
+
+          if (file.fieldname === "audio") {
+            newMultimediaFiles.audio.push(fileData);
+          } else if (file.fieldname === "video") {
+            newMultimediaFiles.video.push(fileData);
+          }
+        });
+      }
+
+      // Merge existing multimedia content with new files
+      let finalMultimediaContent = parsedMultimediaContent ||
+        course.multimediaContent || { audio: [], video: [] };
+      if (
+        newMultimediaFiles.audio.length > 0 ||
+        newMultimediaFiles.video.length > 0
+      ) {
+        finalMultimediaContent = {
+          audio: [
+            ...(finalMultimediaContent?.audio || []),
+            ...newMultimediaFiles.audio,
+          ],
+          video: [
+            ...(finalMultimediaContent?.video || []),
+            ...newMultimediaFiles.video,
+          ],
+        } as any;
+      }
+
       // Update course
       const updates: any = {};
       if (title) updates.title = title;
       if (description) updates.description = description;
       if (subject) updates.subject = subject;
+      if (parsedChapters && parsedChapters !== course.chapters)
+        updates.chapters = parsedChapters;
+      if (coverImagePath !== course.epubCover)
+        updates.epubCover = coverImagePath;
+      if (finalMultimediaContent !== course.multimediaContent)
+        updates.multimediaContent = finalMultimediaContent;
       if (isPublished !== undefined) updates.isPublished = isPublished;
       if (isActive !== undefined) updates.isActive = isActive;
 
@@ -314,6 +581,73 @@ export class CourseController {
       })
         .populate("subject", "name")
         .populate("createdBy", "firstName lastName email");
+
+      if (!updatedCourse) {
+        return res.status(404).json({
+          success: false,
+          message: "Course not found",
+        });
+      }
+
+      // Regenerate EPUB if content changed
+      const contentChanged =
+        title ||
+        description ||
+        (parsedChapters && parsedChapters !== course.chapters) ||
+        coverImagePath !== course.epubCover ||
+        removeExistingCover;
+      if (contentChanged) {
+        try {
+          const epubPath = path.join(
+            process.cwd(),
+            "uploads",
+            "epubs",
+            `${updatedCourse._id}.epub`
+          );
+
+          // Delete old EPUB file if exists
+          if (fs.existsSync(epubPath)) {
+            fs.unlinkSync(epubPath);
+            console.log("🗑️ Deleted old EPUB file:", epubPath);
+          }
+
+          const authorName =
+            typeof updatedCourse.createdBy === "object" &&
+            updatedCourse.createdBy
+              ? `${(updatedCourse.createdBy as any).firstName} ${
+                  (updatedCourse.createdBy as any).lastName
+                }`
+              : "Unknown Author";
+
+          console.log("🔄 Regenerating EPUB for course:", updatedCourse.title);
+          await EpubGenerator.generateEpub({
+            title: updatedCourse.title,
+            description: updatedCourse.description,
+            author: authorName,
+            coverImagePath: updatedCourse.epubCover,
+            chapters: updatedCourse.chapters,
+            outputPath: epubPath,
+          });
+
+          // Update EPUB metadata
+          updatedCourse.epubFile = `uploads/epubs/${updatedCourse._id}.epub`;
+          updatedCourse.epubMetadata = {
+            title: updatedCourse.title,
+            author: authorName,
+            language: "en",
+            description: updatedCourse.description,
+            coverImage: updatedCourse.epubCover,
+            fileSize: fs.existsSync(epubPath) ? fs.statSync(epubPath).size : 0,
+            lastModified: new Date(),
+          };
+
+          await updatedCourse.save();
+          console.log("✅ EPUB regenerated successfully");
+        } catch (epubError) {
+          console.error("❌ EPUB regeneration failed:", epubError);
+          // Continue without regenerating EPUB
+        }
+      }
 
       res.json({
         success: true,
@@ -326,118 +660,92 @@ export class CourseController {
   }
 
   /**
-   * Upload EPUB file for course (Admin only)
+   * Serve EPUB file for reading (not download)
    */
-  static async uploadEpub(req: AuthRequest, res: Response, next: NextFunction) {
+  static async serveEpub(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
 
-      if (!req.file) {
-        return res.status(400).json({
-          success: false,
-          message: "EPUB file is required",
-        });
-      }
-
       const course = await Course.findById(id);
-      if (!course) {
+      if (!course || !course.epubFile) {
         return res.status(404).json({
           success: false,
-          message: "Course not found",
+          message: "EPUB file not found",
         });
       }
 
-      // Delete old EPUB file if exists
-      if (course.epubFile) {
-        const oldFilePath = path.join(process.cwd(), course.epubFile);
-        if (fs.existsSync(oldFilePath)) {
-          fs.unlinkSync(oldFilePath);
-        }
-      }
+      const filePath = path.join(process.cwd(), course.epubFile);
 
-      // Update course with new EPUB file
-      course.epubFile = req.file.path;
-
-      // Extract basic metadata from filename
-      course.epubMetadata = {
-        title: course.title,
-        author: "Unknown",
-        language: "en",
-        fileSize: req.file.size,
-        lastModified: new Date(),
-      };
-
-      await course.save();
-
-      res.json({
-        success: true,
-        message: "EPUB file uploaded successfully",
-        data: {
-          course: course,
-          file: {
-            filename: req.file.filename,
-            originalname: req.file.originalname,
-            size: req.file.size,
-            path: req.file.path,
-          },
-        },
-      });
-    } catch (error) {
-      return next(error);
-    }
-  }
-
-  /**
-   * Upload thumbnail for course (Admin only)
-   */
-  static async uploadThumbnail(
-    req: AuthRequest,
-    res: Response,
-    next: NextFunction
-  ) {
-    try {
-      const { id } = req.params;
-
-      if (!req.file) {
-        return res.status(400).json({
-          success: false,
-          message: "Thumbnail image is required",
-        });
-      }
-
-      const course = await Course.findById(id);
-      if (!course) {
+      if (!fs.existsSync(filePath)) {
         return res.status(404).json({
           success: false,
-          message: "Course not found",
+          message: "EPUB file not found on server",
         });
       }
 
-      // Delete old thumbnail if exists
-      if (course.thumbnail) {
-        const oldFilePath = path.join(process.cwd(), course.thumbnail);
-        if (fs.existsSync(oldFilePath)) {
-          fs.unlinkSync(oldFilePath);
-        }
+      // Get file stats for proper headers
+      const stats = fs.statSync(filePath);
+      const fileSize = stats.size;
+
+      // Handle range requests for epubjs
+      const range = req.headers.range;
+      if (range) {
+        const parts = range.replace(/bytes=/, "").split("-");
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+        const chunksize = end - start + 1;
+
+        res.status(206);
+        res.setHeader("Content-Range", `bytes ${start}-${end}/${fileSize}`);
+        res.setHeader("Accept-Ranges", "bytes");
+        res.setHeader("Content-Length", chunksize);
+        res.setHeader("Content-Type", "application/epub+zip");
+        res.setHeader("Cache-Control", "public, max-age=3600");
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+        res.setHeader(
+          "Access-Control-Allow-Headers",
+          "Range, Content-Type, Accept"
+        );
+
+        const fileStream = fs.createReadStream(filePath, { start, end });
+        fileStream.pipe(res);
+
+        fileStream.on("error", (error) => {
+          console.error("Error streaming EPUB file range:", error);
+          if (!res.headersSent) {
+            res.status(500).json({
+              success: false,
+              message: "Error reading EPUB file",
+            });
+          }
+        });
+      } else {
+        // Full file request
+        res.setHeader("Content-Type", "application/epub+zip");
+        res.setHeader("Content-Length", fileSize);
+        res.setHeader("Accept-Ranges", "bytes");
+        res.setHeader("Cache-Control", "public, max-age=3600");
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+        res.setHeader(
+          "Access-Control-Allow-Headers",
+          "Range, Content-Type, Accept"
+        );
+
+        const fileStream = fs.createReadStream(filePath);
+        fileStream.pipe(res);
+
+        fileStream.on("error", (error) => {
+          console.error("Error streaming EPUB file:", error);
+          if (!res.headersSent) {
+            res.status(500).json({
+              success: false,
+              message: "Error reading EPUB file",
+            });
+          }
+        });
       }
-
-      // Update course with new thumbnail
-      course.thumbnail = req.file.path;
-      await course.save();
-
-      res.json({
-        success: true,
-        message: "Thumbnail uploaded successfully",
-        data: {
-          course: course,
-          file: {
-            filename: req.file.filename,
-            originalname: req.file.originalname,
-            size: req.file.size,
-            path: req.file.path,
-          },
-        },
-      });
     } catch (error) {
       return next(error);
     }
@@ -503,11 +811,30 @@ export class CourseController {
         }
       }
 
-      if (course.thumbnail) {
-        const thumbnailPath = path.join(process.cwd(), course.thumbnail);
-        if (fs.existsSync(thumbnailPath)) {
-          fs.unlinkSync(thumbnailPath);
+      if (course.epubCover) {
+        const coverPath = path.join(process.cwd(), course.epubCover);
+        if (fs.existsSync(coverPath)) {
+          fs.unlinkSync(coverPath);
         }
+      }
+
+      // Delete multimedia files
+      if (course.multimediaContent) {
+        // Delete audio files
+        course.multimediaContent.audio.forEach((audioFile) => {
+          const audioPath = path.join(process.cwd(), audioFile.path);
+          if (fs.existsSync(audioPath)) {
+            fs.unlinkSync(audioPath);
+          }
+        });
+
+        // Delete video files
+        course.multimediaContent.video.forEach((videoFile) => {
+          const videoPath = path.join(process.cwd(), videoFile.path);
+          if (fs.existsSync(videoPath)) {
+            fs.unlinkSync(videoPath);
+          }
+        });
       }
 
       await Course.findByIdAndDelete(id);
@@ -515,6 +842,259 @@ export class CourseController {
       res.json({
         success: true,
         message: "Course deleted successfully",
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  /**
+   * Remove multimedia file from course (Admin only)
+   */
+  static async removeMultimediaFile(
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const { id, fileId, type } = req.params;
+
+      const course = await Course.findById(id);
+      if (!course) {
+        return res.status(404).json({
+          success: false,
+          message: "Course not found",
+        });
+      }
+
+      if (!course.multimediaContent) {
+        return res.status(404).json({
+          success: false,
+          message: "No multimedia content found",
+        });
+      }
+
+      let fileToRemove: any = null;
+      let filePath = "";
+
+      // Find and remove the file based on type
+      if (type === "audio") {
+        const fileIndex = course.multimediaContent.audio.findIndex(
+          (file) => file.id === fileId
+        );
+        if (fileIndex !== -1) {
+          fileToRemove = course.multimediaContent.audio[fileIndex];
+          filePath = fileToRemove.path;
+          course.multimediaContent.audio.splice(fileIndex, 1);
+        }
+      } else if (type === "video") {
+        const fileIndex = course.multimediaContent.video.findIndex(
+          (file) => file.id === fileId
+        );
+        if (fileIndex !== -1) {
+          fileToRemove = course.multimediaContent.video[fileIndex];
+          filePath = fileToRemove.path;
+          course.multimediaContent.video.splice(fileIndex, 1);
+        }
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid file type. Must be 'audio' or 'video'",
+        });
+      }
+
+      if (!fileToRemove) {
+        return res.status(404).json({
+          success: false,
+          message: "File not found",
+        });
+      }
+
+      // Delete the physical file
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+
+      await course.save();
+
+      res.json({
+        success: true,
+        message: "File removed successfully",
+        data: {
+          course: course,
+          removedFile: fileToRemove,
+        },
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  /**
+   * Serve multimedia file
+   */
+  static async serveMultimediaFile(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const { id, type, filename } = req.params;
+
+      const course = await Course.findById(id);
+      if (!course) {
+        return res.status(404).json({
+          success: false,
+          message: "Course not found",
+        });
+      }
+
+      // Check if course is published or user has access
+      if (!course.isPublished && !course.isActive) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied",
+        });
+      }
+
+      console.log("🎵 Serving multimedia file:", { id, type, filename });
+      console.log("🎵 Course multimedia content:", course.multimediaContent);
+
+      if (!course.multimediaContent) {
+        return res.status(404).json({
+          success: false,
+          message: "No multimedia content found",
+        });
+      }
+
+      let fileToServe: any = null;
+
+      // Find the file based on type and filename
+      if (type === "audio") {
+        fileToServe = course.multimediaContent.audio.find(
+          (file) => file.filename === filename
+        );
+      } else if (type === "video") {
+        fileToServe = course.multimediaContent.video.find(
+          (file) => file.filename === filename
+        );
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid file type",
+        });
+      }
+
+      if (!fileToServe) {
+        return res.status(404).json({
+          success: false,
+          message: "File not found",
+        });
+      }
+
+      const filePath = path.join(process.cwd(), fileToServe.path);
+
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({
+          success: false,
+          message: "File not found on server",
+        });
+      }
+
+      // Set appropriate headers
+      res.setHeader("Content-Type", fileToServe.mimeType);
+      res.setHeader("Content-Length", fileToServe.size);
+      res.setHeader(
+        "Content-Disposition",
+        `inline; filename="${fileToServe.originalName}"`
+      );
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+      // Stream the file
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.pipe(res);
+
+      fileStream.on("error", (error) => {
+        console.error("Error streaming file:", error);
+        if (!res.headersSent) {
+          res.status(500).json({
+            success: false,
+            message: "Error serving file",
+          });
+        }
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  /**
+   * Serve cover image
+   */
+  static async serveCoverImage(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const { id } = req.params;
+
+      const course = await Course.findById(id);
+      if (!course) {
+        return res.status(404).json({
+          success: false,
+          message: "Course not found",
+        });
+      }
+
+      console.log("📸 Serving cover image for course:", id);
+      console.log("📸 Course epubCover:", course.epubCover);
+
+      if (!course.epubCover) {
+        return res.status(404).json({
+          success: false,
+          message: "Cover image not found",
+        });
+      }
+
+      const coverPath = path.join(process.cwd(), course.epubCover);
+
+      if (!fs.existsSync(coverPath)) {
+        return res.status(404).json({
+          success: false,
+          message: "Cover image file not found on server",
+        });
+      }
+
+      // Set appropriate headers
+      const ext = path.extname(course.epubCover).toLowerCase();
+      const mimeType =
+        ext === ".jpg" || ext === ".jpeg"
+          ? "image/jpeg"
+          : ext === ".png"
+          ? "image/png"
+          : "image/jpeg";
+
+      res.setHeader("Content-Type", mimeType);
+      res.setHeader("Content-Disposition", `inline; filename="cover${ext}"`);
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+      // Stream the file
+      const fileStream = fs.createReadStream(coverPath);
+      fileStream.pipe(res);
+
+      fileStream.on("error", (error) => {
+        console.error("Error streaming cover image:", error);
+        if (!res.headersSent) {
+          res.status(500).json({
+            success: false,
+            message: "Error serving cover image",
+          });
+        }
       });
     } catch (error) {
       return next(error);
