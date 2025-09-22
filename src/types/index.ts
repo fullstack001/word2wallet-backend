@@ -12,11 +12,43 @@ export interface IUser extends Document {
   role: UserRole;
   isActive: boolean;
   lastLogin?: Date;
+  subscription?: ISubscription;
   createdAt: Date;
   updatedAt: Date;
   fullName: string;
   comparePassword(candidatePassword: string): Promise<boolean>;
   updateLastLogin(): Promise<IUser>;
+}
+
+// Subscription Types
+export interface ISubscription {
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  status: SubscriptionStatus;
+  plan: SubscriptionPlan;
+  trialStart?: Date;
+  trialEnd?: Date;
+  currentPeriodStart?: Date;
+  currentPeriodEnd?: Date;
+  cancelAtPeriodEnd?: boolean;
+  canceledAt?: Date;
+}
+
+export enum SubscriptionStatus {
+  TRIALING = "trialing",
+  ACTIVE = "active",
+  PAST_DUE = "past_due",
+  CANCELED = "canceled",
+  UNPAID = "unpaid",
+  INCOMPLETE = "incomplete",
+  INCOMPLETE_EXPIRED = "incomplete_expired",
+  PAUSED = "paused",
+}
+
+export enum SubscriptionPlan {
+  FREE = "free",
+  BASIC = "basic",
+  PREMIUM = "premium",
 }
 
 export enum UserRole {

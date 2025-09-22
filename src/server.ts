@@ -18,6 +18,8 @@ import userRoutes from "./routes/users";
 import subjectRoutes from "./routes/subjects";
 import courseRoutes from "./routes/courses";
 import contentGenerationRoutes from "./routes/contentGeneration";
+import subscriptionRoutes from "./routes/subscriptions";
+import webhookRoutes from "./routes/webhooks";
 
 // Load environment variables
 dotenv.config();
@@ -97,6 +99,9 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
+// Raw body parsing for Stripe webhooks
+app.use("/api/webhooks/stripe", express.raw({ type: "application/json" }));
+
 // Logging middleware
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
@@ -123,6 +128,8 @@ app.use("/api/users", userRoutes);
 app.use("/api/subjects", subjectRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/content-generation", contentGenerationRoutes);
+app.use("/api/subscriptions", subscriptionRoutes);
+app.use("/api/webhooks", webhookRoutes);
 
 // Error handling middleware
 app.use(notFound);

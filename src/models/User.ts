@@ -1,6 +1,11 @@
 import mongoose, { Schema } from "mongoose";
 import bcrypt from "bcryptjs";
-import { IUser, UserRole } from "../types";
+import {
+  IUser,
+  UserRole,
+  SubscriptionStatus,
+  SubscriptionPlan,
+} from "../types";
 
 const userSchema = new Schema<IUser>(
   {
@@ -44,6 +49,45 @@ const userSchema = new Schema<IUser>(
     },
     lastLogin: {
       type: Date,
+    },
+    subscription: {
+      stripeCustomerId: {
+        type: String,
+      },
+      stripeSubscriptionId: {
+        type: String,
+      },
+      status: {
+        type: String,
+        enum: Object.values(SubscriptionStatus),
+        default: SubscriptionStatus.TRIALING,
+      },
+      plan: {
+        type: String,
+        enum: Object.values(SubscriptionPlan),
+        default: SubscriptionPlan.BASIC,
+      },
+      trialStart: {
+        type: Date,
+        default: Date.now,
+      },
+      trialEnd: {
+        type: Date,
+        default: () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+      },
+      currentPeriodStart: {
+        type: Date,
+      },
+      currentPeriodEnd: {
+        type: Date,
+      },
+      cancelAtPeriodEnd: {
+        type: Boolean,
+        default: false,
+      },
+      canceledAt: {
+        type: Date,
+      },
     },
   },
   {
