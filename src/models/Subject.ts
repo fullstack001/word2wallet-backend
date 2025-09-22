@@ -18,7 +18,6 @@ const subjectSchema = new Schema<ISubject>(
     },
     description: {
       type: String,
-      required: [true, "Subject description is required"],
       trim: true,
       maxlength: [500, "Description cannot exceed 500 characters"],
     },

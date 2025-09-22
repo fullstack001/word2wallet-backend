@@ -17,6 +17,7 @@ import authRoutes from "./routes/auth";
 import userRoutes from "./routes/users";
 import subjectRoutes from "./routes/subjects";
 import courseRoutes from "./routes/courses";
+import contentGenerationRoutes from "./routes/contentGeneration";
 
 // Load environment variables
 dotenv.config();
@@ -121,6 +122,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/subjects", subjectRoutes);
 app.use("/api/courses", courseRoutes);
+app.use("/api/content-generation", contentGenerationRoutes);
 
 // Error handling middleware
 app.use(notFound);

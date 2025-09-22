@@ -9,11 +9,10 @@ export const createCourseValidation = [
       "Course title is required and must be less than 200 characters"
     ),
   body("description")
+    .optional()
     .trim()
-    .isLength({ min: 1, max: 1000 })
-    .withMessage(
-      "Description is required and must be less than 1000 characters"
-    ),
+    .isLength({ max: 1000 })
+    .withMessage("Description must be less than 1000 characters"),
   body("subject").isMongoId().withMessage("Valid subject ID is required"),
   body("isPublished")
     .optional()
@@ -35,7 +34,7 @@ export const updateCourseValidation = [
   body("description")
     .optional()
     .trim()
-    .isLength({ min: 1, max: 1000 })
+    .isLength({ max: 1000 })
     .withMessage("Description must be less than 1000 characters"),
   body("subject")
     .optional()

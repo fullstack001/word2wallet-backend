@@ -576,7 +576,7 @@ export class CourseController {
       // Update course
       const updates: any = {};
       if (title) updates.title = title;
-      if (description) updates.description = description;
+      if (description !== undefined) updates.description = description;
       if (subject) updates.subject = subject;
       if (parsedChapters && parsedChapters !== course.chapters)
         updates.chapters = parsedChapters;

@@ -4,7 +4,7 @@ import { IChapter, EpubMetadata } from "../types";
 
 export interface EpubGenerationOptions {
   title: string;
-  description: string;
+  description?: string;
   author: string;
   coverImagePath?: string;
   chapters: IChapter[];
@@ -45,7 +45,7 @@ export class EpubGenerator {
    */
   private static createEpubStructure(options: {
     title: string;
-    description: string;
+    description?: string;
     author: string;
     coverImagePath?: string;
     chapters: IChapter[];
@@ -96,7 +96,7 @@ export class EpubGenerator {
    */
   private static createContentOpf(options: {
     title: string;
-    description: string;
+    description?: string;
     author: string;
     coverImagePath?: string;
     chapters: IChapter[];
@@ -138,7 +138,7 @@ export class EpubGenerator {
     <dc:identifier id="BookId">urn:uuid:${uuid}</dc:identifier>
     <dc:title>${this.escapeXml(title)}</dc:title>
     <dc:creator>${this.escapeXml(author)}</dc:creator>
-    <dc:description>${this.escapeXml(description)}</dc:description>
+    <dc:description>${this.escapeXml(description || "")}</dc:description>
     <dc:language>en</dc:language>
     <dc:date>${new Date().toISOString()}</dc:date>
     <meta property="dcterms:modified">${new Date().toISOString()}</meta>

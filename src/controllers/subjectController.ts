@@ -277,7 +277,7 @@ export class SubjectController {
       // Update subject
       const updates: any = {};
       if (name) updates.name = name;
-      if (description) updates.description = description;
+      if (description !== undefined) updates.description = description;
       if (isActive !== undefined) updates.isActive = isActive;
 
       const updatedSubject = await Subject.findByIdAndUpdate(id, updates, {

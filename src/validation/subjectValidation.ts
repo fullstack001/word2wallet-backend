@@ -9,11 +9,10 @@ export const createSubjectValidation = [
       "Subject name is required and must be less than 100 characters"
     ),
   body("description")
+    .optional()
     .trim()
-    .isLength({ min: 1, max: 500 })
-    .withMessage(
-      "Description is required and must be less than 500 characters"
-    ),
+    .isLength({ max: 500 })
+    .withMessage("Description must be less than 500 characters"),
 ];
 
 // Update subject validation rules
@@ -26,7 +25,7 @@ export const updateSubjectValidation = [
   body("description")
     .optional()
     .trim()
-    .isLength({ min: 1, max: 500 })
+    .isLength({ max: 500 })
     .withMessage("Description must be less than 500 characters"),
   body("isActive")
     .optional()

@@ -29,7 +29,7 @@ export interface ISubject extends Document {
   _id: string;
   name: string;
   slug?: string;
-  description: string;
+  description?: string;
   isActive: boolean;
   createdBy: mongoose.Types.ObjectId;
   createdAt: Date;
@@ -53,7 +53,7 @@ export interface ICourse extends Document {
   _id: string;
   title: string;
   slug?: string;
-  description: string;
+  description?: string;
   subject: mongoose.Types.ObjectId; // Subject ID
   epubFile?: string; // File path
   epubMetadata?: EpubMetadata;
