@@ -60,12 +60,12 @@ const userSchema = new Schema<IUser>(
       status: {
         type: String,
         enum: Object.values(SubscriptionStatus),
-        default: SubscriptionStatus.TRIALING,
+        default: SubscriptionStatus.UNPAID,
       },
       plan: {
         type: String,
         enum: Object.values(SubscriptionPlan),
-        default: SubscriptionPlan.BASIC,
+        default: SubscriptionPlan.FREE,
       },
       trialStart: {
         type: Date,
