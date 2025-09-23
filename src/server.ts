@@ -20,6 +20,7 @@ import courseRoutes from "./routes/courses";
 import contentGenerationRoutes from "./routes/contentGeneration";
 import subscriptionRoutes from "./routes/subscriptions";
 import webhookRoutes from "./routes/webhooks";
+import dashboardRoutes from "./routes/dashboard";
 
 // Load environment variables
 dotenv.config();
@@ -130,6 +131,7 @@ app.use("/api/courses", courseRoutes);
 app.use("/api/content-generation", contentGenerationRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/webhooks", webhookRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 // Error handling middleware
 app.use(notFound);

@@ -66,4 +66,10 @@ router.post(
   SubscriptionController.createSetupIntent
 );
 
+router.post(
+  "/trial",
+  authenticate,
+  SubscriptionController.createTrialSubscription
+);
+
 export default router;

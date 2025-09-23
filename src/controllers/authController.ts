@@ -141,6 +141,7 @@ export class AuthController {
             role: user.role,
             fullName: user.fullName,
             lastLogin: user.lastLogin,
+            subscription: user.subscription,
           },
           tokens,
         },

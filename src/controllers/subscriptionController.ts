@@ -461,4 +461,68 @@ export class SubscriptionController {
       return next(error);
     }
   }
+
+  /**
+   * Create a trial subscription for new users
+   */
+  static async createTrialSubscription(
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message: "User not authenticated",
+        });
+      }
+
+      // Check if user already has a subscription
+      if (user.subscription?.stripeSubscriptionId) {
+        return res.status(400).json({
+          success: false,
+          message: "User already has a subscription",
+        });
+      }
+
+      // Create a trial subscription without payment method
+      const trialEndDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+
+      // Update user with trial subscription info
+      const updatedUser = await User.findByIdAndUpdate(
+        user._id,
+        {
+          "subscription.status": "trialing",
+          "subscription.plan": "basic",
+          "subscription.trialStart": new Date(),
+          "subscription.trialEnd": trialEndDate,
+        },
+        { new: true }
+      );
+
+      res.status(201).json({
+        success: true,
+        message: "Trial subscription created successfully",
+        data: {
+          subscription: {
+            status: "trialing",
+            plan: "basic",
+            trialStart: new Date(),
+            trialEnd: trialEndDate,
+          },
+          user: {
+            id: updatedUser!._id,
+            email: updatedUser!.email,
+            firstName: updatedUser!.firstName,
+            lastName: updatedUser!.lastName,
+            subscription: updatedUser!.subscription,
+          },
+        },
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
 }
