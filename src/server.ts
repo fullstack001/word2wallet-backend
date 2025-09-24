@@ -21,6 +21,7 @@ import contentGenerationRoutes from "./routes/contentGeneration";
 import subscriptionRoutes from "./routes/subscriptions";
 import webhookRoutes from "./routes/webhooks";
 import dashboardRoutes from "./routes/dashboard";
+import translationRoutes from "./routes/translation";
 
 // Load environment variables
 dotenv.config();
@@ -132,6 +133,7 @@ app.use("/api/content-generation", contentGenerationRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/webhooks", webhookRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/translation", translationRoutes);
 
 // Error handling middleware
 app.use(notFound);
