@@ -30,6 +30,16 @@ const cancelSubscriptionValidation = [
     .withMessage("Immediately must be a boolean"),
 ];
 
+const upgradeTrialValidation = [
+  body("paymentMethodId")
+    .notEmpty()
+    .withMessage("Payment method ID is required"),
+  body("plan")
+    .optional()
+    .isIn(["pro", "premium"])
+    .withMessage("Plan must be either 'pro' or 'premium'"),
+];
+
 // Routes
 router.post(
   "/",
@@ -70,6 +80,13 @@ router.post(
   "/trial",
   authenticate,
   SubscriptionController.createTrialSubscription
+);
+
+router.post(
+  "/upgrade",
+  authenticate,
+  upgradeTrialValidation,
+  SubscriptionController.upgradeTrialSubscription
 );
 
 export default router;

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { validationResult } from "express-validator";
 import { User } from "../models/User";
 import { StripeService } from "../services/stripeService";
+import { EmailService } from "../services/emailService";
 import { AuthRequest } from "../types";
 import { CustomError } from "../middleware/errorHandler";
 
@@ -74,10 +75,12 @@ export class SubscriptionController {
       }
 
       // Create subscription with trial
-      const subscription = await StripeService.createSubscription(
+      const subscription = await StripeService.createSubscription({
         customerId,
-        priceId
-      );
+        priceId,
+        paymentMethodId,
+        trialPeriodDays: 7,
+      });
 
       // Update user with subscription info
       const updatedUser = await User.findByIdAndUpdate(
@@ -487,30 +490,100 @@ export class SubscriptionController {
         });
       }
 
-      // Create a trial subscription without payment method
-      const trialEndDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+      const { paymentMethodId, plan = "pro" } = req.body;
+
+      // Create Stripe customer if not exists
+      let customerId = user.subscription?.stripeCustomerId;
+      if (!customerId) {
+        const customer = await StripeService.createCustomer({
+          email: user.email,
+          name: user.fullName,
+        });
+        customerId = customer.id;
+      }
+
+      // Attach payment method to customer if provided
+      if (paymentMethodId) {
+        await StripeService.attachPaymentMethod(paymentMethodId, customerId);
+
+        // Set as default payment method
+        await StripeService.stripe.customers.update(customerId, {
+          invoice_settings: {
+            default_payment_method: paymentMethodId,
+          },
+        });
+      }
+
+      // Create Stripe subscription with trial
+      let priceId: string;
+      try {
+        priceId = StripeService.getPriceIdFromPlan(plan as any);
+      } catch (error) {
+        console.error("Price ID configuration error:", error);
+        return res.status(500).json({
+          success: false,
+          message:
+            "Subscription service configuration error. Please contact support.",
+        });
+      }
+
+      const subscription = await StripeService.createSubscription({
+        customerId,
+        priceId,
+        paymentMethodId,
+        trialPeriodDays: 7,
+      });
 
       // Update user with trial subscription info
       const updatedUser = await User.findByIdAndUpdate(
         user._id,
         {
-          "subscription.status": "trialing",
-          "subscription.plan": "pro",
+          "subscription.stripeCustomerId": customerId,
+          "subscription.stripeSubscriptionId": subscription.id,
+          "subscription.status": subscription.status,
+          "subscription.plan": plan,
           "subscription.trialStart": new Date(),
-          "subscription.trialEnd": trialEndDate,
+          "subscription.trialEnd": subscription.trial_end
+            ? new Date(subscription.trial_end * 1000)
+            : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          "subscription.currentPeriodStart": new Date(
+            subscription.current_period_start * 1000
+          ),
+          "subscription.currentPeriodEnd": new Date(
+            subscription.current_period_end * 1000
+          ),
         },
         { new: true }
       );
+
+      // Send trial start email
+      try {
+        const trialEndDate = subscription.trial_end
+          ? new Date(subscription.trial_end * 1000)
+          : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        await EmailService.sendTrialStartEmail(updatedUser!, trialEndDate);
+      } catch (emailError) {
+        console.error("Failed to send trial start email:", emailError);
+        // Don't fail the subscription creation if email fails
+      }
 
       res.status(201).json({
         success: true,
         message: "Trial subscription created successfully",
         data: {
           subscription: {
-            status: "trialing",
-            plan: "pro",
+            stripeCustomerId: customerId,
+            stripeSubscriptionId: subscription.id,
+            status: subscription.status,
+            plan: plan,
             trialStart: new Date(),
-            trialEnd: trialEndDate,
+            trialEnd: subscription.trial_end
+              ? new Date(subscription.trial_end * 1000)
+              : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            currentPeriodStart: new Date(
+              subscription.current_period_start * 1000
+            ),
+            currentPeriodEnd: new Date(subscription.current_period_end * 1000),
           },
           user: {
             id: updatedUser!._id,
@@ -518,6 +591,140 @@ export class SubscriptionController {
             firstName: updatedUser!.firstName,
             lastName: updatedUser!.lastName,
             subscription: updatedUser!.subscription,
+          },
+        },
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  /**
+   * Upgrade trial subscription to paid subscription
+   */
+  static async upgradeTrialSubscription(
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: "Validation failed",
+          errors: errors.array(),
+        });
+      }
+
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message: "User not authenticated",
+        });
+      }
+
+      const { paymentMethodId, plan = "pro" } = req.body;
+
+      // Check if user has a trial subscription
+      if (user.subscription?.status !== "trialing") {
+        return res.status(400).json({
+          success: false,
+          message: "User must have an active trial to upgrade",
+        });
+      }
+
+      // Create Stripe customer if not exists
+      let customerId = user.subscription?.stripeCustomerId;
+      if (!customerId) {
+        const customer = await StripeService.createCustomer({
+          email: user.email,
+          name: user.fullName,
+        });
+        customerId = customer.id;
+      }
+
+      // Attach payment method to customer
+      await StripeService.attachPaymentMethod(paymentMethodId, customerId);
+
+      // Create Stripe subscription
+      const priceId = StripeService.getPriceIdFromPlan(plan as any);
+      if (!priceId) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid plan specified",
+        });
+      }
+
+      const subscription = await StripeService.createSubscription({
+        customerId,
+        priceId,
+        paymentMethodId,
+        trialPeriodDays: 0, // No trial since they already had one
+      });
+
+      // Update user subscription in database
+      const updatedUser = await User.findByIdAndUpdate(
+        user._id,
+        {
+          "subscription.stripeCustomerId": customerId,
+          "subscription.stripeSubscriptionId": subscription.id,
+          "subscription.status": subscription.status,
+          "subscription.plan": plan,
+          "subscription.currentPeriodStart": new Date(
+            subscription.current_period_start * 1000
+          ),
+          "subscription.currentPeriodEnd": new Date(
+            subscription.current_period_end * 1000
+          ),
+          "subscription.cancelAtPeriodEnd": false,
+        },
+        { new: true }
+      );
+
+      if (!updatedUser) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      // Send trial success email
+      try {
+        const subscriptionEndDate = new Date(
+          subscription.current_period_end * 1000
+        );
+        await EmailService.sendTrialSuccessEmail(
+          updatedUser,
+          subscriptionEndDate
+        );
+      } catch (emailError) {
+        console.error("Failed to send trial success email:", emailError);
+        // Don't fail the subscription upgrade if email fails
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Subscription upgraded successfully",
+        data: {
+          subscription: {
+            stripeCustomerId: customerId,
+            stripeSubscriptionId: subscription.id,
+            status: subscription.status,
+            plan: plan,
+            currentPeriodStart: new Date(
+              subscription.current_period_start * 1000
+            ),
+            currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+            cancelAtPeriodEnd: false,
+          },
+          user: {
+            id: updatedUser._id,
+            email: updatedUser.email,
+            firstName: updatedUser.firstName,
+            lastName: updatedUser.lastName,
+            subscription: updatedUser.subscription,
           },
         },
       });

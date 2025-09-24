@@ -15,35 +15,69 @@ export class StripeService {
   /**
    * Create a Stripe customer
    */
-  static async createCustomer(user: IUser): Promise<Stripe.Customer> {
+  static async createCustomer(user: IUser): Promise<Stripe.Customer>;
+  static async createCustomer(customerData: {
+    email: string;
+    name: string;
+  }): Promise<Stripe.Customer>;
+  static async createCustomer(
+    userOrData: IUser | { email: string; name: string }
+  ): Promise<Stripe.Customer> {
     const customer = await stripe.customers.create({
-      email: user.email,
-      name: user.fullName,
-      metadata: {
-        userId: user._id.toString(),
-      },
+      email: userOrData.email,
+      name: "name" in userOrData ? userOrData.name : userOrData.fullName,
+      metadata:
+        "fullName" in userOrData
+          ? {
+              userId: userOrData._id.toString(),
+            }
+          : {},
     });
 
     return customer;
   }
 
   /**
-   * Create a subscription with 7-day trial
+   * Create a subscription with trial
    */
-  static async createSubscription(
-    customerId: string,
-    priceId: string
-  ): Promise<Stripe.Subscription> {
+  static async createSubscription(params: {
+    customerId: string;
+    priceId: string;
+    paymentMethodId: string;
+    trialPeriodDays?: number;
+  }): Promise<Stripe.Subscription> {
+    const {
+      customerId,
+      priceId,
+      paymentMethodId,
+      trialPeriodDays = 0,
+    } = params;
+
     const subscription = await stripe.subscriptions.create({
       customer: customerId,
       items: [{ price: priceId }],
-      trial_period_days: 7,
+      default_payment_method: paymentMethodId,
+      trial_period_days: trialPeriodDays,
       payment_behavior: "default_incomplete",
       payment_settings: { save_default_payment_method: "on_subscription" },
       expand: ["latest_invoice.payment_intent"],
     });
 
     return subscription;
+  }
+
+  /**
+   * Attach payment method to customer
+   */
+  static async attachPaymentMethod(
+    paymentMethodId: string,
+    customerId: string
+  ): Promise<Stripe.PaymentMethod> {
+    const paymentMethod = await stripe.paymentMethods.attach(paymentMethodId, {
+      customer: customerId,
+    });
+
+    return paymentMethod;
   }
 
   /**
@@ -171,7 +205,7 @@ export class StripeService {
   static getPlanFromPriceId(priceId: string): SubscriptionPlan {
     // This should match your Stripe price IDs
     const priceToPlanMap: { [key: string]: SubscriptionPlan } = {
-      [process.env.STRIPE_PRO_PRICE_ID || ""]: SubscriptionPlan.PRO,
+      [process.env.STRIPE_BASIC_PRICE_ID || ""]: SubscriptionPlan.PRO,
       [process.env.STRIPE_PREMIUM_PRICE_ID || ""]: SubscriptionPlan.PREMIUM,
     };
 
@@ -184,10 +218,19 @@ export class StripeService {
   static getPriceIdFromPlan(plan: SubscriptionPlan): string {
     const planToPriceMap: { [key in SubscriptionPlan]: string } = {
       [SubscriptionPlan.FREE]: "",
-      [SubscriptionPlan.PRO]: process.env.STRIPE_PRO_PRICE_ID || "",
+      [SubscriptionPlan.PRO]: process.env.STRIPE_BASIC_PRICE_ID || "",
       [SubscriptionPlan.PREMIUM]: process.env.STRIPE_PREMIUM_PRICE_ID || "",
     };
 
-    return planToPriceMap[plan];
+    const priceId = planToPriceMap[plan];
+
+    // Check if price ID is available for paid plans
+    if (plan !== SubscriptionPlan.FREE && !priceId) {
+      throw new Error(
+        `Price ID not configured for plan: ${plan}. Please set STRIPE_${plan.toUpperCase()}_PRICE_ID environment variable.`
+      );
+    }
+
+    return priceId;
   }
 }
