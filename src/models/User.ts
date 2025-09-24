@@ -60,20 +60,16 @@ const userSchema = new Schema<IUser>(
       status: {
         type: String,
         enum: Object.values(SubscriptionStatus),
-        default: SubscriptionStatus.UNPAID,
       },
       plan: {
         type: String,
         enum: Object.values(SubscriptionPlan),
-        default: SubscriptionPlan.FREE,
       },
       trialStart: {
         type: Date,
-        default: Date.now,
       },
       trialEnd: {
         type: Date,
-        default: () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
       },
       currentPeriodStart: {
         type: Date,

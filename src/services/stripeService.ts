@@ -171,11 +171,11 @@ export class StripeService {
   static getPlanFromPriceId(priceId: string): SubscriptionPlan {
     // This should match your Stripe price IDs
     const priceToPlanMap: { [key: string]: SubscriptionPlan } = {
-      [process.env.STRIPE_BASIC_PRICE_ID || ""]: SubscriptionPlan.BASIC,
+      [process.env.STRIPE_PRO_PRICE_ID || ""]: SubscriptionPlan.PRO,
       [process.env.STRIPE_PREMIUM_PRICE_ID || ""]: SubscriptionPlan.PREMIUM,
     };
 
-    return priceToPlanMap[priceId] || SubscriptionPlan.BASIC;
+    return priceToPlanMap[priceId] || SubscriptionPlan.PRO;
   }
 
   /**
@@ -184,7 +184,7 @@ export class StripeService {
   static getPriceIdFromPlan(plan: SubscriptionPlan): string {
     const planToPriceMap: { [key in SubscriptionPlan]: string } = {
       [SubscriptionPlan.FREE]: "",
-      [SubscriptionPlan.BASIC]: process.env.STRIPE_BASIC_PRICE_ID || "",
+      [SubscriptionPlan.PRO]: process.env.STRIPE_PRO_PRICE_ID || "",
       [SubscriptionPlan.PREMIUM]: process.env.STRIPE_PREMIUM_PRICE_ID || "",
     };
 

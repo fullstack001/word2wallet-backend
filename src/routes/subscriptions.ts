@@ -13,14 +13,14 @@ const createSubscriptionValidation = [
     .withMessage("Payment method ID must be a string"),
   body("plan")
     .optional()
-    .isIn(["basic", "premium"])
-    .withMessage("Plan must be either 'basic' or 'premium'"),
+    .isIn(["pro", "premium"])
+    .withMessage("Plan must be either 'pro' or 'premium'"),
 ];
 
 const updateSubscriptionValidation = [
   body("plan")
-    .isIn(["basic", "premium"])
-    .withMessage("Plan must be either 'basic' or 'premium'"),
+    .isIn(["pro", "premium"])
+    .withMessage("Plan must be either 'pro' or 'premium'"),
 ];
 
 const cancelSubscriptionValidation = [

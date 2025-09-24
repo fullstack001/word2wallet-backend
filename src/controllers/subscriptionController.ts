@@ -32,7 +32,7 @@ export class SubscriptionController {
         });
       }
 
-      const { paymentMethodId, plan = "basic" } = req.body;
+      const { paymentMethodId, plan = "pro" } = req.body;
 
       // Check if user already has a subscription
       if (user.subscription?.stripeSubscriptionId) {
@@ -90,9 +90,9 @@ export class SubscriptionController {
           ),
           "subscription.plan": StripeService.getPlanFromPriceId(priceId),
           "subscription.trialStart": new Date(),
-          "subscription.trialEnd": subscription.trial_end
-            ? new Date(subscription.trial_end * 1000)
-            : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          "subscription.trialEnd": new Date(
+            Date.now() + 7 * 24 * 60 * 60 * 1000
+          ),
           "subscription.currentPeriodStart": new Date(
             subscription.current_period_start * 1000
           ),
@@ -495,7 +495,7 @@ export class SubscriptionController {
         user._id,
         {
           "subscription.status": "trialing",
-          "subscription.plan": "basic",
+          "subscription.plan": "pro",
           "subscription.trialStart": new Date(),
           "subscription.trialEnd": trialEndDate,
         },
@@ -508,7 +508,7 @@ export class SubscriptionController {
         data: {
           subscription: {
             status: "trialing",
-            plan: "basic",
+            plan: "pro",
             trialStart: new Date(),
             trialEnd: trialEndDate,
           },

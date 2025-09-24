@@ -47,7 +47,7 @@ export enum SubscriptionStatus {
 
 export enum SubscriptionPlan {
   FREE = "free",
-  BASIC = "basic",
+  PRO = "pro",
   PREMIUM = "premium",
 }
 
