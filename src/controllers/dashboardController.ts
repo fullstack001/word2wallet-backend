@@ -74,11 +74,18 @@ export class DashboardController {
           })),
           subscription: subscription
             ? {
+                stripeCustomerId: subscription.stripeCustomerId,
+                stripeSubscriptionId: subscription.stripeSubscriptionId,
                 status: subscription.status,
                 plan: subscription.plan,
                 trialStart: subscription.trialStart,
                 trialEnd: subscription.trialEnd,
+                currentPeriodStart: subscription.currentPeriodStart,
                 currentPeriodEnd: subscription.currentPeriodEnd,
+                cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+                canceledAt: subscription.canceledAt,
+                cancellationReason: subscription.cancellationReason,
+                cancellationFeedback: subscription.cancellationFeedback,
               }
             : null,
         },

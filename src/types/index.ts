@@ -12,7 +12,11 @@ export interface IUser extends Document {
   role: UserRole;
   isActive: boolean;
   lastLogin?: Date;
+  emailUnsubscribed: boolean;
+  emailUnsubscribedAt?: Date;
   subscription?: ISubscription;
+  trialEligible: boolean;
+  hasCanceledSubscription: boolean;
   createdAt: Date;
   updatedAt: Date;
   fullName: string;
@@ -32,6 +36,8 @@ export interface ISubscription {
   currentPeriodEnd?: Date;
   cancelAtPeriodEnd?: boolean;
   canceledAt?: Date;
+  cancellationReason?: string;
+  cancellationFeedback?: string;
 }
 
 export enum SubscriptionStatus {

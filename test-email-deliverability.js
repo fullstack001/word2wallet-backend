@@ -211,6 +211,10 @@ async function testSend() {
         "h:X-Mailgun-Track": "yes",
         "h:X-Mailgun-Track-Clicks": "yes",
         "h:X-Mailgun-Track-Opens": "yes",
+        "h:List-Unsubscribe": `<https://word2wallet.com/unsubscribe?email=${encodeURIComponent(
+          TEST_EMAIL
+        )}>, <mailto:unsubscribe@word2wallet.com?subject=Unsubscribe>`,
+        "h:List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
       },
       "api",
       API_KEY

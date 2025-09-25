@@ -28,9 +28,34 @@ const cancelSubscriptionValidation = [
     .optional()
     .isBoolean()
     .withMessage("Immediately must be a boolean"),
+  body("reason")
+    .optional()
+    .isString()
+    .withMessage("Cancellation reason must be a string"),
+  body("feedback")
+    .optional()
+    .isString()
+    .withMessage("Cancellation feedback must be a string"),
 ];
 
 const upgradeTrialValidation = [
+  body("paymentMethodId")
+    .notEmpty()
+    .withMessage("Payment method ID is required"),
+  body("plan")
+    .optional()
+    .isIn(["pro", "premium"])
+    .withMessage("Plan must be either 'pro' or 'premium'"),
+];
+
+const upgradeTrialImmediateValidation = [
+  body("plan")
+    .optional()
+    .isIn(["pro", "premium"])
+    .withMessage("Plan must be either 'pro' or 'premium'"),
+];
+
+const upgradeDirectValidation = [
   body("paymentMethodId")
     .notEmpty()
     .withMessage("Payment method ID is required"),
@@ -87,6 +112,20 @@ router.post(
   authenticate,
   upgradeTrialValidation,
   SubscriptionController.upgradeTrialSubscription
+);
+
+router.post(
+  "/upgrade-trial",
+  authenticate,
+  upgradeTrialImmediateValidation,
+  SubscriptionController.upgradeTrialImmediate
+);
+
+router.post(
+  "/upgrade-direct",
+  authenticate,
+  upgradeDirectValidation,
+  SubscriptionController.upgradeSubscriptionDirect
 );
 
 export default router;

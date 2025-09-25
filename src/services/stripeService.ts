@@ -45,23 +45,34 @@ export class StripeService {
     priceId: string;
     paymentMethodId: string;
     trialPeriodDays?: number;
+    immediatePayment?: boolean;
   }): Promise<Stripe.Subscription> {
     const {
       customerId,
       priceId,
       paymentMethodId,
       trialPeriodDays = 0,
+      immediatePayment = false,
     } = params;
 
-    const subscription = await stripe.subscriptions.create({
+    const subscriptionParams: any = {
       customer: customerId,
       items: [{ price: priceId }],
       default_payment_method: paymentMethodId,
       trial_period_days: trialPeriodDays,
-      payment_behavior: "default_incomplete",
       payment_settings: { save_default_payment_method: "on_subscription" },
       expand: ["latest_invoice.payment_intent"],
-    });
+    };
+
+    // For immediate payment (direct upgrades), use error_if_incomplete
+    // For trials, use default_incomplete to allow trial without payment
+    if (immediatePayment) {
+      subscriptionParams.payment_behavior = "error_if_incomplete";
+    } else {
+      subscriptionParams.payment_behavior = "default_incomplete";
+    }
+
+    const subscription = await stripe.subscriptions.create(subscriptionParams);
 
     return subscription;
   }

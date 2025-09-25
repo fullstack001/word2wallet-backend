@@ -50,6 +50,13 @@ const userSchema = new Schema<IUser>(
     lastLogin: {
       type: Date,
     },
+    emailUnsubscribed: {
+      type: Boolean,
+      default: false,
+    },
+    emailUnsubscribedAt: {
+      type: Date,
+    },
     subscription: {
       stripeCustomerId: {
         type: String,
@@ -84,6 +91,22 @@ const userSchema = new Schema<IUser>(
       canceledAt: {
         type: Date,
       },
+      cancellationReason: {
+        type: String,
+      },
+      cancellationFeedback: {
+        type: String,
+      },
+    },
+    // Track trial eligibility
+    trialEligible: {
+      type: Boolean,
+      default: true,
+    },
+    // Track if user has ever canceled a subscription
+    hasCanceledSubscription: {
+      type: Boolean,
+      default: false,
     },
   },
   {

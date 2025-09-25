@@ -80,6 +80,14 @@ export class EmailService {
    */
   static async sendTrialStartEmail(user: IUser, trialEndDate: Date) {
     try {
+      // Check if user has unsubscribed from emails
+      if (user.emailUnsubscribed) {
+        console.log(
+          `User ${user.email} has unsubscribed from emails, skipping trial start email`
+        );
+        return null;
+      }
+
       const template = EmailTemplates.getTrialStartEmail({
         user,
         trialEndDate,
@@ -95,6 +103,10 @@ export class EmailService {
         "h:X-Mailgun-Track": "yes",
         "h:X-Mailgun-Track-Clicks": "yes",
         "h:X-Mailgun-Track-Opens": "yes",
+        "h:List-Unsubscribe": `<https://word2wallet.com/unsubscribe?email=${encodeURIComponent(
+          user.email
+        )}>, <mailto:unsubscribe@word2wallet.com?subject=Unsubscribe>`,
+        "h:List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
       };
 
       const response = await this.sendEmailViaHTTP(data);
@@ -114,6 +126,14 @@ export class EmailService {
     subscriptionEndDate: Date
   ) {
     try {
+      // Check if user has unsubscribed from emails
+      if (user.emailUnsubscribed) {
+        console.log(
+          `User ${user.email} has unsubscribed from emails, skipping payment processing email`
+        );
+        return null;
+      }
+
       const template = EmailTemplates.getPaymentProcessingEmail({
         user,
         subscriptionEndDate,
@@ -129,6 +149,10 @@ export class EmailService {
         "h:X-Mailgun-Track": "yes",
         "h:X-Mailgun-Track-Clicks": "yes",
         "h:X-Mailgun-Track-Opens": "yes",
+        "h:List-Unsubscribe": `<https://word2wallet.com/unsubscribe?email=${encodeURIComponent(
+          user.email
+        )}>, <mailto:unsubscribe@word2wallet.com?subject=Unsubscribe>`,
+        "h:List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
       };
 
       const response = await this.sendEmailViaHTTP(data);
@@ -145,6 +169,14 @@ export class EmailService {
    */
   static async sendTrialSuccessEmail(user: IUser, subscriptionEndDate: Date) {
     try {
+      // Check if user has unsubscribed from emails
+      if (user.emailUnsubscribed) {
+        console.log(
+          `User ${user.email} has unsubscribed from emails, skipping trial success email`
+        );
+        return null;
+      }
+
       const template = EmailTemplates.getTrialSuccessEmail({
         user,
         subscriptionEndDate,
@@ -160,6 +192,10 @@ export class EmailService {
         "h:X-Mailgun-Track": "yes",
         "h:X-Mailgun-Track-Clicks": "yes",
         "h:X-Mailgun-Track-Opens": "yes",
+        "h:List-Unsubscribe": `<https://word2wallet.com/unsubscribe?email=${encodeURIComponent(
+          user.email
+        )}>, <mailto:unsubscribe@word2wallet.com?subject=Unsubscribe>`,
+        "h:List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
       };
 
       const response = await this.sendEmailViaHTTP(data);
@@ -176,6 +212,14 @@ export class EmailService {
    */
   static async sendPaymentFailureEmail(user: IUser, retryDate: Date) {
     try {
+      // Check if user has unsubscribed from emails
+      if (user.emailUnsubscribed) {
+        console.log(
+          `User ${user.email} has unsubscribed from emails, skipping payment failure email`
+        );
+        return null;
+      }
+
       const template = EmailTemplates.getPaymentFailureEmail({
         user,
         retryDate,
@@ -191,6 +235,10 @@ export class EmailService {
         "h:X-Mailgun-Track": "yes",
         "h:X-Mailgun-Track-Clicks": "yes",
         "h:X-Mailgun-Track-Opens": "yes",
+        "h:List-Unsubscribe": `<https://word2wallet.com/unsubscribe?email=${encodeURIComponent(
+          user.email
+        )}>, <mailto:unsubscribe@word2wallet.com?subject=Unsubscribe>`,
+        "h:List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
       };
 
       const response = await this.sendEmailViaHTTP(data);
@@ -207,6 +255,14 @@ export class EmailService {
    */
   static async sendWelcomeEmail(user: IUser) {
     try {
+      // Check if user has unsubscribed from emails
+      if (user.emailUnsubscribed) {
+        console.log(
+          `User ${user.email} has unsubscribed from emails, skipping welcome email`
+        );
+        return null;
+      }
+
       const template = EmailTemplates.getWelcomeEmail({ user });
 
       const data = {
@@ -219,6 +275,10 @@ export class EmailService {
         "h:X-Mailgun-Track": "yes",
         "h:X-Mailgun-Track-Clicks": "yes",
         "h:X-Mailgun-Track-Opens": "yes",
+        "h:List-Unsubscribe": `<https://word2wallet.com/unsubscribe?email=${encodeURIComponent(
+          user.email
+        )}>, <mailto:unsubscribe@word2wallet.com?subject=Unsubscribe>`,
+        "h:List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
       };
 
       const response = await this.sendEmailViaHTTP(data);
@@ -235,6 +295,14 @@ export class EmailService {
    */
   static async sendPasswordResetEmail(user: IUser, resetToken: string) {
     try {
+      // Check if user has unsubscribed from emails
+      if (user.emailUnsubscribed) {
+        console.log(
+          `User ${user.email} has unsubscribed from emails, skipping password reset email`
+        );
+        return null;
+      }
+
       const template = EmailTemplates.getPasswordResetEmail({
         user,
         resetToken,
@@ -250,6 +318,10 @@ export class EmailService {
         "h:X-Mailgun-Track": "yes",
         "h:X-Mailgun-Track-Clicks": "yes",
         "h:X-Mailgun-Track-Opens": "yes",
+        "h:List-Unsubscribe": `<https://word2wallet.com/unsubscribe?email=${encodeURIComponent(
+          user.email
+        )}>, <mailto:unsubscribe@word2wallet.com?subject=Unsubscribe>`,
+        "h:List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
       };
 
       const response = await this.sendEmailViaHTTP(data);
@@ -269,6 +341,14 @@ export class EmailService {
     cancellationDate: Date
   ) {
     try {
+      // Check if user has unsubscribed from emails
+      if (user.emailUnsubscribed) {
+        console.log(
+          `User ${user.email} has unsubscribed from emails, skipping subscription cancelled email`
+        );
+        return null;
+      }
+
       const template = EmailTemplates.getSubscriptionCancelledEmail({
         user,
         cancellationDate,
@@ -284,6 +364,10 @@ export class EmailService {
         "h:X-Mailgun-Track": "yes",
         "h:X-Mailgun-Track-Clicks": "yes",
         "h:X-Mailgun-Track-Opens": "yes",
+        "h:List-Unsubscribe": `<https://word2wallet.com/unsubscribe?email=${encodeURIComponent(
+          user.email
+        )}>, <mailto:unsubscribe@word2wallet.com?subject=Unsubscribe>`,
+        "h:List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
       };
 
       const response = await this.sendEmailViaHTTP(data);

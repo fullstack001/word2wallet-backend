@@ -219,4 +219,45 @@ router.patch(
   }
 );
 
+/**
+ * Unsubscribe from emails (Public endpoint)
+ */
+router.post(
+  "/unsubscribe",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({
+          success: false,
+          message: "Email is required",
+        });
+      }
+
+      // Find user by email
+      const user = await User.findOne({ email: email.toLowerCase() });
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      // Update user to mark as unsubscribed from emails
+      await User.findByIdAndUpdate(user._id, {
+        emailUnsubscribed: true,
+        emailUnsubscribedAt: new Date(),
+      });
+
+      return res.json({
+        success: true,
+        message: "Successfully unsubscribed from emails",
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+);
+
 export default router;
