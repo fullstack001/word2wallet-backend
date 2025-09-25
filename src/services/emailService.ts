@@ -1,17 +1,12 @@
-import formData from "form-data";
-import Mailgun from "mailgun.js";
 import { IUser } from "../types";
 import { EmailTemplates } from "./emailTemplates";
-
-// Initialize Mailgun
-const mailgun = new Mailgun(formData);
-const mg = mailgun.client({
-  username: "api",
-  key: process.env.MAILGUN_API_KEY!,
-});
+import https from "https";
 
 const DOMAIN = process.env.MAILGUN_DOMAIN!;
+const API_KEY = process.env.MAILGUN_API_KEY!;
 const FROM_EMAIL = process.env.MAILGUN_FROM_EMAIL || "noreply@word2wallet.com";
+const REGION = (process.env.MAILGUN_REGION || "US").toUpperCase();
+const API_BASE = REGION === "EU" ? "api.eu.mailgun.net" : "api.mailgun.net";
 
 export class EmailService {
   /**
@@ -23,6 +18,61 @@ export class EmailService {
       .replace(/<[^>]*>/g, "") // Remove HTML tags
       .replace(/\s+/g, " ") // Replace multiple spaces with single space
       .trim();
+  }
+
+  /**
+   * Send email via HTTP request (same method as test script)
+   */
+  private static async sendEmailViaHTTP(emailData: any): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const body = new URLSearchParams(emailData).toString();
+      const headers = {
+        Authorization: `Basic ${Buffer.from(`api:${API_KEY}`).toString(
+          "base64"
+        )}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Length": Buffer.byteLength(body),
+      };
+
+      const req = https.request(
+        {
+          hostname: API_BASE,
+          port: 443,
+          path: `/v3/${DOMAIN}/messages`,
+          method: "POST",
+          headers,
+        },
+        (res) => {
+          let data = "";
+          res.on("data", (chunk) => (data += chunk));
+          res.on("end", () => {
+            try {
+              const json = JSON.parse(data);
+              if (
+                res.statusCode &&
+                res.statusCode >= 200 &&
+                res.statusCode < 300
+              ) {
+                resolve(json);
+              } else {
+                reject(
+                  new Error(
+                    `HTTP ${res.statusCode || "unknown"}: ${
+                      json.message || data
+                    }`
+                  )
+                );
+              }
+            } catch {
+              reject(new Error(`Invalid JSON response: ${data}`));
+            }
+          });
+        }
+      );
+      req.on("error", reject);
+      req.write(body);
+      req.end();
+    });
   }
 
   /**
@@ -39,16 +89,15 @@ export class EmailService {
         from: `Word2Wallet <${FROM_EMAIL}>`,
         to: [user.email],
         subject: template.subject,
-        html: template.html,
         text: template.text || this.generateTextVersion(template.html),
+        html: template.html,
         "h:Reply-To": "support@word2wallet.com",
-        "h:List-Unsubscribe": "<mailto:unsubscribe@word2wallet.com>",
         "h:X-Mailgun-Track": "yes",
         "h:X-Mailgun-Track-Clicks": "yes",
         "h:X-Mailgun-Track-Opens": "yes",
       };
 
-      const response = await mg.messages.create(DOMAIN, data);
+      const response = await this.sendEmailViaHTTP(data);
       console.log("Trial start email sent:", response);
       return response;
     } catch (error) {
@@ -74,16 +123,15 @@ export class EmailService {
         from: `Word2Wallet <${FROM_EMAIL}>`,
         to: [user.email],
         subject: template.subject,
-        html: template.html,
         text: template.text || this.generateTextVersion(template.html),
+        html: template.html,
         "h:Reply-To": "support@word2wallet.com",
-        "h:List-Unsubscribe": "<mailto:unsubscribe@word2wallet.com>",
         "h:X-Mailgun-Track": "yes",
         "h:X-Mailgun-Track-Clicks": "yes",
         "h:X-Mailgun-Track-Opens": "yes",
       };
 
-      const response = await mg.messages.create(DOMAIN, data);
+      const response = await this.sendEmailViaHTTP(data);
       console.log("Payment processing email sent:", response);
       return response;
     } catch (error) {
@@ -106,16 +154,15 @@ export class EmailService {
         from: `Word2Wallet <${FROM_EMAIL}>`,
         to: [user.email],
         subject: template.subject,
-        html: template.html,
         text: template.text || this.generateTextVersion(template.html),
+        html: template.html,
         "h:Reply-To": "support@word2wallet.com",
-        "h:List-Unsubscribe": "<mailto:unsubscribe@word2wallet.com>",
         "h:X-Mailgun-Track": "yes",
         "h:X-Mailgun-Track-Clicks": "yes",
         "h:X-Mailgun-Track-Opens": "yes",
       };
 
-      const response = await mg.messages.create(DOMAIN, data);
+      const response = await this.sendEmailViaHTTP(data);
       console.log("Trial success email sent:", response);
       return response;
     } catch (error) {
@@ -138,16 +185,15 @@ export class EmailService {
         from: `Word2Wallet <${FROM_EMAIL}>`,
         to: [user.email],
         subject: template.subject,
-        html: template.html,
         text: template.text || this.generateTextVersion(template.html),
+        html: template.html,
         "h:Reply-To": "support@word2wallet.com",
-        "h:List-Unsubscribe": "<mailto:unsubscribe@word2wallet.com>",
         "h:X-Mailgun-Track": "yes",
         "h:X-Mailgun-Track-Clicks": "yes",
         "h:X-Mailgun-Track-Opens": "yes",
       };
 
-      const response = await mg.messages.create(DOMAIN, data);
+      const response = await this.sendEmailViaHTTP(data);
       console.log("Payment failure email sent:", response);
       return response;
     } catch (error) {
@@ -167,16 +213,15 @@ export class EmailService {
         from: `Word2Wallet <${FROM_EMAIL}>`,
         to: [user.email],
         subject: template.subject,
-        html: template.html,
         text: template.text || this.generateTextVersion(template.html),
+        html: template.html,
         "h:Reply-To": "support@word2wallet.com",
-        "h:List-Unsubscribe": "<mailto:unsubscribe@word2wallet.com>",
         "h:X-Mailgun-Track": "yes",
         "h:X-Mailgun-Track-Clicks": "yes",
         "h:X-Mailgun-Track-Opens": "yes",
       };
 
-      const response = await mg.messages.create(DOMAIN, data);
+      const response = await this.sendEmailViaHTTP(data);
       console.log("Welcome email sent:", response);
       return response;
     } catch (error) {
@@ -199,16 +244,15 @@ export class EmailService {
         from: `Word2Wallet <${FROM_EMAIL}>`,
         to: [user.email],
         subject: template.subject,
-        html: template.html,
         text: template.text || this.generateTextVersion(template.html),
+        html: template.html,
         "h:Reply-To": "support@word2wallet.com",
-        "h:List-Unsubscribe": "<mailto:unsubscribe@word2wallet.com>",
         "h:X-Mailgun-Track": "yes",
         "h:X-Mailgun-Track-Clicks": "yes",
         "h:X-Mailgun-Track-Opens": "yes",
       };
 
-      const response = await mg.messages.create(DOMAIN, data);
+      const response = await this.sendEmailViaHTTP(data);
       console.log("Password reset email sent:", response);
       return response;
     } catch (error) {
@@ -234,16 +278,15 @@ export class EmailService {
         from: `Word2Wallet <${FROM_EMAIL}>`,
         to: [user.email],
         subject: template.subject,
-        html: template.html,
         text: template.text || this.generateTextVersion(template.html),
+        html: template.html,
         "h:Reply-To": "support@word2wallet.com",
-        "h:List-Unsubscribe": "<mailto:unsubscribe@word2wallet.com>",
         "h:X-Mailgun-Track": "yes",
         "h:X-Mailgun-Track-Clicks": "yes",
         "h:X-Mailgun-Track-Opens": "yes",
       };
 
-      const response = await mg.messages.create(DOMAIN, data);
+      const response = await this.sendEmailViaHTTP(data);
       console.log("Subscription cancelled email sent:", response);
       return response;
     } catch (error) {

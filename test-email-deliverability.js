@@ -1,347 +1,249 @@
 #!/usr/bin/env node
-
-/**
- * Email Deliverability Testing Script
- *
- * This script helps you test your email setup to avoid spam folder
- *
- * Usage:
- * node test-email-deliverability.js
- */
-
+// npm i dotenv
+require("dotenv").config();
 const https = require("https");
-const http = require("http");
 
-// Configuration
-const DOMAIN = process.env.MAILGUN_DOMAIN || "mg.yourdomain.com";
-const API_KEY = process.env.MAILGUN_API_KEY || "your-mailgun-api-key";
-const FROM_EMAIL = process.env.MAILGUN_FROM_EMAIL || "noreply@yourdomain.com";
+const DOMAIN = process.env.MAILGUN_DOMAIN; // e.g. mg.wordtowallet.com
+const API_KEY = process.env.MAILGUN_API_KEY; // key-...
+const FROM_EMAIL = process.env.MAILGUN_FROM_EMAIL; // noreply@mg.wordtowallet.com
+const REGION = (process.env.MAILGUN_REGION || "US").toUpperCase(); // US | EU
+const TEST_EMAIL = process.env.TEST_EMAIL || "you@example.com";
+const DKIM_SELECTORS = (process.env.MAILGUN_DKIM_SELECTORS || "smtp,mailo,k1")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 
-// Test email addresses (use your own for testing)
-const TEST_EMAILS = ["mr.dimas332@gmail.com"];
-
-/**
- * Test SPF Record
- */
-async function testSPFRecord(domain) {
-  console.log("🔍 Testing SPF Record...");
-
-  try {
-    const response = await makeRequest(
-      `https://dns.google/resolve?name=${domain}&type=TXT`
-    );
-    const data = JSON.parse(response);
-
-    const spfRecord = data.Answer?.find(
-      (record) =>
-        record.data.includes("v=spf1") && record.data.includes("mailgun.org")
-    );
-
-    if (spfRecord) {
-      console.log("✅ SPF Record found:", spfRecord.data);
-      return true;
-    } else {
-      console.log("❌ SPF Record not found or incorrect");
-      return false;
-    }
-  } catch (error) {
-    console.log("❌ Error checking SPF record:", error.message);
-    return false;
-  }
+if (!DOMAIN || !API_KEY || !FROM_EMAIL) {
+  console.error(
+    "❌ Missing env vars. Required: MAILGUN_DOMAIN, MAILGUN_API_KEY, MAILGUN_FROM_EMAIL"
+  );
+  process.exit(1);
 }
 
-/**
- * Test DKIM Record
- */
-async function testDKIMRecord(domain) {
-  console.log("🔍 Testing DKIM Record...");
+const ROOT = DOMAIN.replace(/^mg\./i, "");
+const API_BASE = REGION === "EU" ? "api.eu.mailgun.net" : "api.mailgun.net";
 
-  try {
-    const dkimDomain = `mg._domainkey.${domain}`;
-    const response = await makeRequest(
-      `https://dns.google/resolve?name=${dkimDomain}&type=TXT`
-    );
-    const data = JSON.parse(response);
-
-    const dkimRecord = data.Answer?.find(
-      (record) => record.data.includes("k=rsa") && record.data.includes("p=")
-    );
-
-    if (dkimRecord) {
-      console.log(
-        "✅ DKIM Record found:",
-        dkimRecord.data.substring(0, 50) + "..."
-      );
-      return true;
-    } else {
-      console.log("❌ DKIM Record not found or incorrect");
-      return false;
-    }
-  } catch (error) {
-    console.log("❌ Error checking DKIM record:", error.message);
-    return false;
-  }
-}
-
-/**
- * Test DMARC Record
- */
-async function testDMARCRecord(domain) {
-  console.log("🔍 Testing DMARC Record...");
-
-  try {
-    const dmarcDomain = `_dmarc.${domain}`;
-    const response = await makeRequest(
-      `https://dns.google/resolve?name=${dmarcDomain}&type=TXT`
-    );
-    const data = JSON.parse(response);
-
-    const dmarcRecord = data.Answer?.find((record) =>
-      record.data.includes("v=DMARC1")
-    );
-
-    if (dmarcRecord) {
-      console.log("✅ DMARC Record found:", dmarcRecord.data);
-      return true;
-    } else {
-      console.log("❌ DMARC Record not found or incorrect");
-      return false;
-    }
-  } catch (error) {
-    console.log("❌ Error checking DMARC record:", error.message);
-    return false;
-  }
-}
-
-/**
- * Test CNAME Record
- */
-async function testCNAMERecord(domain) {
-  console.log("🔍 Testing CNAME Record...");
-
-  try {
-    const cnameDomain = `mg.${domain}`;
-    const response = await makeRequest(
-      `https://dns.google/resolve?name=${cnameDomain}&type=CNAME`
-    );
-    const data = JSON.parse(response);
-
-    const cnameRecord = data.Answer?.find((record) =>
-      record.data.includes("mailgun.org")
-    );
-
-    if (cnameRecord) {
-      console.log("✅ CNAME Record found:", cnameRecord.data);
-      return true;
-    } else {
-      console.log("❌ CNAME Record not found or incorrect");
-      return false;
-    }
-  } catch (error) {
-    console.log("❌ Error checking CNAME record:", error.message);
-    return false;
-  }
-}
-
-/**
- * Test Email Sending
- */
-async function testEmailSending() {
-  console.log("🔍 Testing Email Sending...");
-
-  try {
-    const testEmail = {
-      from: `Word2Wallet <${FROM_EMAIL}>`,
-      to: TEST_EMAILS[0], // Send to first test email
-      subject: "Test Email - Deliverability Check",
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Test Email</title>
-        </head>
-        <body style="margin: 0; padding: 20px; font-family: Arial, sans-serif;">
-          <h2>Test Email</h2>
-          <p>This is a test email to check deliverability.</p>
-          <p>If you receive this email, your setup is working!</p>
-          <p>Best regards,<br>Word2Wallet Team</p>
-        </body>
-        </html>
-      `,
-      text: `Test Email
-
-This is a test email to check deliverability.
-
-If you receive this email, your setup is working!
-
-Best regards,
-Word2Wallet Team`,
-      "h:Reply-To": "support@word2wallet.com",
-      "h:List-Unsubscribe": "<mailto:unsubscribe@word2wallet.com>",
-      "h:X-Mailgun-Track": "yes",
-      "h:X-Mailgun-Track-Clicks": "yes",
-      "h:X-Mailgun-Track-Opens": "yes",
-    };
-
-    const response = await sendMailgunEmail(testEmail);
-
-    if (response.id) {
-      console.log("✅ Test email sent successfully");
-      console.log("📧 Message ID:", response.id);
-      return true;
-    } else {
-      console.log("❌ Failed to send test email");
-      return false;
-    }
-  } catch (error) {
-    console.log("❌ Error sending test email:", error.message);
-    return false;
-  }
-}
-
-/**
- * Send email via Mailgun
- */
-async function sendMailgunEmail(emailData) {
-  return new Promise((resolve, reject) => {
-    const postData = new URLSearchParams();
-
-    // Add all email fields
-    Object.keys(emailData).forEach((key) => {
-      postData.append(key, emailData[key]);
-    });
-
-    const options = {
-      hostname: "api.mailgun.net",
-      port: 443,
-      path: `/v3/${DOMAIN}/messages`,
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${Buffer.from(`api:${API_KEY}`).toString(
-          "base64"
-        )}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Content-Length": Buffer.byteLength(postData.toString()),
-      },
-    };
-
-    const req = https.request(options, (res) => {
-      let data = "";
-
-      res.on("data", (chunk) => {
-        data += chunk;
-      });
-
-      res.on("end", () => {
-        try {
-          const response = JSON.parse(data);
-          if (res.statusCode === 200) {
-            resolve(response);
-          } else {
-            reject(
-              new Error(`HTTP ${res.statusCode}: ${response.message || data}`)
-            );
-          }
-        } catch (error) {
-          reject(new Error(`Invalid JSON response: ${data}`));
-        }
-      });
-    });
-
-    req.on("error", (error) => {
-      reject(error);
-    });
-
-    req.write(postData.toString());
-    req.end();
-  });
-}
-
-/**
- * Make HTTP request
- */
-async function makeRequest(url) {
+function httpGetJSON(url) {
   return new Promise((resolve, reject) => {
     https
       .get(url, (res) => {
         let data = "";
-
-        res.on("data", (chunk) => {
-          data += chunk;
-        });
-
+        res.on("data", (chunk) => (data += chunk));
         res.on("end", () => {
-          resolve(data);
+          try {
+            resolve(JSON.parse(data));
+          } catch {
+            reject(new Error(`Invalid JSON from ${url}: ${data}`));
+          }
         });
       })
-      .on("error", (error) => {
-        reject(error);
-      });
+      .on("error", reject);
   });
 }
 
-/**
- * Main testing function
- */
-async function runTests() {
-  console.log("🚀 Starting Email Deliverability Tests...\n");
+async function qTXT(name) {
+  return httpGetJSON(
+    `https://dns.google/resolve?name=${encodeURIComponent(name)}&type=TXT`
+  );
+}
+async function qCNAME(name) {
+  return httpGetJSON(
+    `https://dns.google/resolve?name=${encodeURIComponent(name)}&type=CNAME`
+  );
+}
+async function qMX(name) {
+  return httpGetJSON(
+    `https://dns.google/resolve?name=${encodeURIComponent(name)}&type=MX`
+  );
+}
 
-  // Extract domain from MAILGUN_DOMAIN
-  const domain = DOMAIN.replace("mg.", "");
+function hasAnswer(r) {
+  return Array.isArray(r.Answer) && r.Answer.length > 0;
+}
 
-  console.log(`📧 Testing domain: ${domain}`);
+async function testSPF() {
+  console.log("🔍 SPF...");
+  const names = [DOMAIN, ROOT]; // check mg.domain and root
+  for (const name of names) {
+    try {
+      const r = await qTXT(name);
+      if (hasAnswer(r)) {
+        const spf = r.Answer.find((a) => a.data.includes("v=spf1"));
+        if (spf) {
+          console.log(`  ✅ Found at ${name}: ${spf.data}`);
+          return true;
+        }
+      }
+    } catch {}
+  }
+  console.log("  ❌ SPF not found (check TXT at mg.domain or root)");
+  return false;
+}
+
+async function testDKIM() {
+  console.log("🔍 DKIM...");
+  for (const sel of DKIM_SELECTORS) {
+    const name = `${sel}._domainkey.${DOMAIN}`;
+    try {
+      const r = await qTXT(name);
+      if (hasAnswer(r)) {
+        const hit = r.Answer.find(
+          (a) => a.data.includes("k=rsa") && a.data.includes("p=")
+        );
+        if (hit) {
+          console.log(`  ✅ Selector ${sel}: present`);
+          return true; // at least one selector is enough
+        }
+      }
+    } catch {}
+  }
+  console.log(
+    "  ❌ No DKIM selectors resolved (check TXT like smtp._domainkey.mg.domain)"
+  );
+  return false;
+}
+
+async function testDMARC() {
+  console.log("🔍 DMARC...");
+  const names = [`_dmarc.${ROOT}`, `_dmarc.${DOMAIN}`]; // check root & mg subdomain
+  let ok = false;
+  for (const name of names) {
+    try {
+      const r = await qTXT(name);
+      if (hasAnswer(r)) {
+        const rec = r.Answer.find((a) => a.data.includes("v=DMARC1"));
+        if (rec) {
+          console.log(`  ✅ Found at ${name}: ${rec.data}`);
+          ok = true;
+        }
+      }
+    } catch {}
+  }
+  if (!ok) console.log("  ❌ DMARC not found");
+  return ok;
+}
+
+async function testCNAME() {
+  console.log("🔍 Tracking CNAME...");
+  const name = `email.${DOMAIN}`; // Mailgun default tracking CNAME
+  try {
+    const r = await qCNAME(name);
+    if (hasAnswer(r)) {
+      const rec = r.Answer.find((a) => /mailgun\.org\.?$/i.test(a.data));
+      if (rec) {
+        console.log(`  ✅ ${name} → ${rec.data}`);
+        return true;
+      }
+    }
+  } catch {}
+  console.log("  ❌ CNAME not found (expect email.mg.domain → mailgun.org)");
+  return false;
+}
+
+async function testMX() {
+  console.log("🔍 MX for bounce processing...");
+  try {
+    const r = await qMX(DOMAIN);
+    if (hasAnswer(r)) {
+      const hosts = r.Answer.map((a) => a.data.toLowerCase());
+      const hasA = hosts.some((h) => h.includes("mxa.mailgun.org"));
+      const hasB = hosts.some((h) => h.includes("mxb.mailgun.org"));
+      if (hasA && hasB) {
+        console.log("  ✅ mxa.mailgun.org and mxb.mailgun.org present");
+        return true;
+      }
+    }
+  } catch {}
+  console.log(
+    "  ❌ Missing one or both MX (need mxa & mxb priority 10 on mg.domain)"
+  );
+  return false;
+}
+
+function postForm(hostname, path, payload, authUser, authPass) {
+  const body = new URLSearchParams(payload).toString();
+  const headers = {
+    Authorization: `Basic ${Buffer.from(`${authUser}:${authPass}`).toString(
+      "base64"
+    )}`,
+    "Content-Type": "application/x-www-form-urlencoded",
+    "Content-Length": Buffer.byteLength(body),
+  };
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      { hostname, port: 443, path, method: "POST", headers },
+      (res) => {
+        let data = "";
+        res.on("data", (d) => (data += d));
+        res.on("end", () => {
+          try {
+            const json = JSON.parse(data);
+            if (res.statusCode >= 200 && res.statusCode < 300) resolve(json);
+            else
+              reject(
+                new Error(`HTTP ${res.statusCode}: ${json.message || data}`)
+              );
+          } catch {
+            reject(new Error(`Invalid JSON response: ${data}`));
+          }
+        });
+      }
+    );
+    req.on("error", reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+async function testSend() {
+  console.log("🔍 Sending test email...");
+  try {
+    const res = await postForm(
+      API_BASE,
+      `/v3/${DOMAIN}/messages`,
+      {
+        from: `Word2Wallet <${FROM_EMAIL}>`,
+        to: TEST_EMAIL,
+        subject: "Mailgun Deliverability Test",
+        text: "This is a deliverability test from Mailgun.",
+        html: "<p>This is a <b>deliverability</b> test from Mailgun.</p>",
+        "h:Reply-To": "support@wordtowallet.com",
+        "h:X-Mailgun-Track": "yes",
+        "h:X-Mailgun-Track-Clicks": "yes",
+        "h:X-Mailgun-Track-Opens": "yes",
+      },
+      "api",
+      API_KEY
+    );
+    console.log("  ✅ Sent. Message ID:", res.id || "(no id)");
+    return true;
+  } catch (e) {
+    console.log("  ❌ Send failed:", e.message);
+    return false;
+  }
+}
+
+(async function run() {
+  console.log("🚀 Email Deliverability Tests\n");
+  console.log(`📧 Root domain: ${ROOT}`);
   console.log(`📧 Mailgun domain: ${DOMAIN}`);
-  console.log(`📧 From email: ${FROM_EMAIL}\n`);
+  console.log(`📧 From: ${FROM_EMAIL}`);
+  console.log(`🌍 Region: ${REGION}\n`);
 
   const results = {
-    spf: await testSPFRecord(domain),
-    dkim: await testDKIMRecord(domain),
-    dmarc: await testDMARCRecord(domain),
-    cname: await testCNAMERecord(domain),
-    email: await testEmailSending(),
+    spf: await testSPF(),
+    dkim: await testDKIM(),
+    dmarc: await testDMARC(),
+    cname: await testCNAME(),
+    mx: await testMX(),
+    send: await testSend(),
   };
 
-  console.log("\n📊 Test Results Summary:");
-  console.log("========================");
-  console.log(`SPF Record: ${results.spf ? "✅ Pass" : "❌ Fail"}`);
-  console.log(`DKIM Record: ${results.dkim ? "✅ Pass" : "❌ Fail"}`);
-  console.log(`DMARC Record: ${results.dmarc ? "✅ Pass" : "❌ Fail"}`);
-  console.log(`CNAME Record: ${results.cname ? "✅ Pass" : "❌ Fail"}`);
-  console.log(`Email Sending: ${results.email ? "✅ Pass" : "❌ Fail"}`);
-
-  const passedTests = Object.values(results).filter(Boolean).length;
-  const totalTests = Object.keys(results).length;
-
-  console.log(`\n🎯 Overall Score: ${passedTests}/${totalTests} tests passed`);
-
-  if (passedTests === totalTests) {
-    console.log("🎉 All tests passed! Your email setup is ready.");
-  } else {
-    console.log("⚠️  Some tests failed. Please check your DNS setup.");
-    console.log("\n📚 Next Steps:");
-    console.log("1. Check your DNS records");
-    console.log("2. Wait for DNS propagation (24-48 hours)");
-    console.log("3. Test with Mail Tester: https://www.mail-tester.com");
-    console.log("4. Check spam folder placement");
+  console.log("\n📊 Summary");
+  for (const [k, v] of Object.entries(results)) {
+    console.log(`${k.toUpperCase().padEnd(6)}: ${v ? "✅" : "❌"}`);
   }
-
-  console.log("\n📖 For more help, see:");
-  console.log("- DNS_SETUP_GUIDE.md");
-  console.log("- EMAIL_DELIVERABILITY_GUIDE.md");
-}
-
-// Run tests if this script is executed directly
-if (require.main === module) {
-  runTests().catch(console.error);
-}
-
-module.exports = {
-  testSPFRecord,
-  testDKIMRecord,
-  testDMARCRecord,
-  testCNAMERecord,
-  testEmailSending,
-  runTests,
-};
+  const pass = Object.values(results).filter(Boolean).length;
+  console.log(`\n🎯 ${pass}/${Object.keys(results).length} checks passed\n`);
+  process.exit(pass === Object.keys(results).length ? 0 : 2);
+})();
