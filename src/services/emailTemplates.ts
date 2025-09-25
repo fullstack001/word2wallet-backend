@@ -3,6 +3,7 @@ import { IUser } from "../types";
 export interface EmailTemplate {
   subject: string;
   html: string;
+  text?: string;
 }
 
 export interface EmailTemplateData {
@@ -12,7 +13,23 @@ export interface EmailTemplateData {
 
 export class EmailTemplates {
   /**
-   * Base HTML template with common styling
+   * Generate text version from HTML content
+   */
+  static generateTextVersion(html: string): string {
+    return html
+      .replace(/<[^>]*>/g, "") // Remove HTML tags
+      .replace(/\s+/g, " ") // Replace multiple spaces with single space
+      .replace(/&nbsp;/g, " ") // Replace HTML entities
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .trim();
+  }
+
+  /**
+   * Base HTML template with common styling and spam prevention
    */
   static getBaseTemplate(content: string): string {
     return `
@@ -22,6 +39,8 @@ export class EmailTemplates {
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Word2Wallet</title>
+        <meta name="format-detection" content="telephone=no">
+        <meta name="x-apple-disable-message-reformatting">
         <style>
           @media only screen and (max-width: 600px) {
             .container { width: 100% !important; }
@@ -29,9 +48,18 @@ export class EmailTemplates {
             .content { padding: 20px !important; }
             .button { display: block !important; width: 100% !important; }
           }
+          /* Prevent Gmail from changing link colors */
+          a[x-apple-data-detectors] {
+            color: inherit !important;
+            text-decoration: none !important;
+            font-size: inherit !important;
+            font-family: inherit !important;
+            font-weight: inherit !important;
+            line-height: inherit !important;
+          }
         </style>
       </head>
-      <body style="margin: 0; padding: 0; background-color: #f8f9fa; font-family: Arial, sans-serif;">
+      <body style="margin: 0; padding: 0; background-color: #f8f9fa; font-family: Arial, sans-serif; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
         <div class="container" style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
           ${content}
         </div>
@@ -190,19 +218,53 @@ export class EmailTemplates {
       </p>
     `;
 
+    const html = this.getBaseTemplate(
+      this.createHeader(
+        "🎉 Welcome to Word2Wallet Pro!",
+        "Your 7-day free trial has started"
+      ) +
+        this.createContent(content) +
+        this.createFooter(
+          "You're receiving this email because you started a trial with Word2Wallet."
+        )
+    );
+
+    const text = `Welcome to Word2Wallet Pro!
+
+Hi ${user.firstName}!
+
+Welcome to Word2Wallet Pro! Your 7-day free trial is now active and you have full access to all our premium features.
+
+What you get with your trial:
+- Full platform access
+- Interactive ePub3 creation
+- Multilingual support
+- Direct email marketing tools
+- Advanced analytics
+
+Trial Details:
+Trial ends: ${trialEndDate.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })}
+You can cancel anytime during your trial with no charges.
+
+Get started: ${process.env.FRONTEND_URL}/
+
+Questions? Reply to this email or contact our support team.
+
+Best regards,
+The Word2Wallet Team
+
+You're receiving this email because you started a trial with Word2Wallet.`;
+
     return {
       subject:
         "🎉 Welcome to Word2Wallet Pro - Your 7-Day Free Trial Has Started!",
-      html: this.getBaseTemplate(
-        this.createHeader(
-          "🎉 Welcome to Word2Wallet Pro!",
-          "Your 7-day free trial has started"
-        ) +
-          this.createContent(content) +
-          this.createFooter(
-            "You're receiving this email because you started a trial with Word2Wallet."
-          )
-      ),
+      html,
+      text,
     };
   }
 

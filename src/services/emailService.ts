@@ -15,6 +15,17 @@ const FROM_EMAIL = process.env.MAILGUN_FROM_EMAIL || "noreply@word2wallet.com";
 
 export class EmailService {
   /**
+   * Generate text version from HTML
+   */
+  private static generateTextVersion(html: string): string {
+    // Simple HTML to text conversion
+    return html
+      .replace(/<[^>]*>/g, "") // Remove HTML tags
+      .replace(/\s+/g, " ") // Replace multiple spaces with single space
+      .trim();
+  }
+
+  /**
    * Send welcome email when user starts trial
    */
   static async sendTrialStartEmail(user: IUser, trialEndDate: Date) {
@@ -29,6 +40,12 @@ export class EmailService {
         to: [user.email],
         subject: template.subject,
         html: template.html,
+        text: template.text || this.generateTextVersion(template.html),
+        "h:Reply-To": "support@word2wallet.com",
+        "h:List-Unsubscribe": "<mailto:unsubscribe@word2wallet.com>",
+        "h:X-Mailgun-Track": "yes",
+        "h:X-Mailgun-Track-Clicks": "yes",
+        "h:X-Mailgun-Track-Opens": "yes",
       };
 
       const response = await mg.messages.create(DOMAIN, data);
@@ -58,6 +75,12 @@ export class EmailService {
         to: [user.email],
         subject: template.subject,
         html: template.html,
+        text: template.text || this.generateTextVersion(template.html),
+        "h:Reply-To": "support@word2wallet.com",
+        "h:List-Unsubscribe": "<mailto:unsubscribe@word2wallet.com>",
+        "h:X-Mailgun-Track": "yes",
+        "h:X-Mailgun-Track-Clicks": "yes",
+        "h:X-Mailgun-Track-Opens": "yes",
       };
 
       const response = await mg.messages.create(DOMAIN, data);
@@ -84,6 +107,12 @@ export class EmailService {
         to: [user.email],
         subject: template.subject,
         html: template.html,
+        text: template.text || this.generateTextVersion(template.html),
+        "h:Reply-To": "support@word2wallet.com",
+        "h:List-Unsubscribe": "<mailto:unsubscribe@word2wallet.com>",
+        "h:X-Mailgun-Track": "yes",
+        "h:X-Mailgun-Track-Clicks": "yes",
+        "h:X-Mailgun-Track-Opens": "yes",
       };
 
       const response = await mg.messages.create(DOMAIN, data);
@@ -110,6 +139,12 @@ export class EmailService {
         to: [user.email],
         subject: template.subject,
         html: template.html,
+        text: template.text || this.generateTextVersion(template.html),
+        "h:Reply-To": "support@word2wallet.com",
+        "h:List-Unsubscribe": "<mailto:unsubscribe@word2wallet.com>",
+        "h:X-Mailgun-Track": "yes",
+        "h:X-Mailgun-Track-Clicks": "yes",
+        "h:X-Mailgun-Track-Opens": "yes",
       };
 
       const response = await mg.messages.create(DOMAIN, data);
@@ -133,6 +168,12 @@ export class EmailService {
         to: [user.email],
         subject: template.subject,
         html: template.html,
+        text: template.text || this.generateTextVersion(template.html),
+        "h:Reply-To": "support@word2wallet.com",
+        "h:List-Unsubscribe": "<mailto:unsubscribe@word2wallet.com>",
+        "h:X-Mailgun-Track": "yes",
+        "h:X-Mailgun-Track-Clicks": "yes",
+        "h:X-Mailgun-Track-Opens": "yes",
       };
 
       const response = await mg.messages.create(DOMAIN, data);
@@ -159,6 +200,12 @@ export class EmailService {
         to: [user.email],
         subject: template.subject,
         html: template.html,
+        text: template.text || this.generateTextVersion(template.html),
+        "h:Reply-To": "support@word2wallet.com",
+        "h:List-Unsubscribe": "<mailto:unsubscribe@word2wallet.com>",
+        "h:X-Mailgun-Track": "yes",
+        "h:X-Mailgun-Track-Clicks": "yes",
+        "h:X-Mailgun-Track-Opens": "yes",
       };
 
       const response = await mg.messages.create(DOMAIN, data);
@@ -188,6 +235,12 @@ export class EmailService {
         to: [user.email],
         subject: template.subject,
         html: template.html,
+        text: template.text || this.generateTextVersion(template.html),
+        "h:Reply-To": "support@word2wallet.com",
+        "h:List-Unsubscribe": "<mailto:unsubscribe@word2wallet.com>",
+        "h:X-Mailgun-Track": "yes",
+        "h:X-Mailgun-Track-Clicks": "yes",
+        "h:X-Mailgun-Track-Opens": "yes",
       };
 
       const response = await mg.messages.create(DOMAIN, data);
