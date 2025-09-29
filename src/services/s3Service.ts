@@ -334,6 +334,17 @@ export const getS3Service = (): S3Service => {
       endpoint: process.env.S3_ENDPOINT, // Optional for S3-compatible services
     };
 
+    // Validate required configuration
+    if (!config.accessKeyId) {
+      throw new Error("S3_ACCESS_KEY_ID environment variable is required");
+    }
+    if (!config.secretAccessKey) {
+      throw new Error("S3_SECRET_ACCESS_KEY environment variable is required");
+    }
+    if (!config.bucket) {
+      throw new Error("S3_BUCKET environment variable is required");
+    }
+
     s3ServiceInstance = new S3Service(config);
   }
 

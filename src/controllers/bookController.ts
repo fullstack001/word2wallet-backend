@@ -3,6 +3,7 @@ import { validationResult } from "express-validator";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import {
   IBook,
   BookStatus,
@@ -14,7 +15,7 @@ import { Book } from "../models/Book";
 import { JobService } from "../services/jobService";
 import { JobType } from "../types";
 import { EpubService } from "../services/epubService";
-import { getS3Service } from "../services/s3Service";
+import { getStorageService } from "../services/storageService";
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -90,6 +91,13 @@ export class BookController {
         req.file.originalname
       );
 
+      // Calculate SHA-256 checksum of the uploaded file
+      const fileBuffer = fs.readFileSync(req.file.path);
+      const checksum = crypto
+        .createHash("sha256")
+        .update(fileBuffer)
+        .digest("hex");
+
       // Create book record
       const book = new Book({
         userId,
@@ -104,7 +112,7 @@ export class BookController {
         fileKey,
         fileName: req.file.originalname,
         fileSize: req.file.size,
-        checksum: "", // Will be calculated during validation
+        checksum,
         metadata: {
           title,
           creator: author,
@@ -115,16 +123,15 @@ export class BookController {
 
       await book.save();
 
-      // Upload file to S3
-      const s3Service = getS3Service();
-      const fileBuffer = fs.readFileSync(req.file.path);
-      await s3Service.uploadFile(
+      // Upload file to storage
+      const storageService = getStorageService();
+      await storageService.uploadFile(
         fileKey,
         fileBuffer,
         EpubService.getEpubMimeType(),
         {
-          userId,
-          bookId: book._id,
+          userId: userId.toString(),
+          bookId: book._id.toString(),
           originalName: req.file.originalname,
         }
       );
@@ -140,11 +147,11 @@ export class BookController {
         filePath: req.file.path,
       });
 
-              res.status(201).json({
-                success: true,
-                message: "Book uploaded successfully",
-                data: book as any,
-              } as ApiResponse<IBook>);
+      res.status(201).json({
+        success: true,
+        message: "Book uploaded successfully",
+        data: book as any,
+      } as ApiResponse<IBook>);
     } catch (error) {
       console.error("Upload book error:", error);
 
@@ -218,17 +225,17 @@ export class BookController {
         Book.countDocuments(query),
       ]);
 
-              res.json({
-                success: true,
-                message: "Books retrieved successfully",
-                data: books as any,
-                pagination: {
-                  page: Number(page),
-                  limit: Number(limit),
-                  total,
-                  pages: Math.ceil(total / Number(limit)),
-                },
-              } as ApiResponse<IBook[]>);
+      res.json({
+        success: true,
+        message: "Books retrieved successfully",
+        data: books as any,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total,
+          pages: Math.ceil(total / Number(limit)),
+        },
+      } as ApiResponse<IBook[]>);
     } catch (error) {
       console.error("Get user books error:", error);
       res.status(500).json({
@@ -256,11 +263,11 @@ export class BookController {
         return;
       }
 
-              res.json({
-                success: true,
-                message: "Book retrieved successfully",
-                data: book as any,
-              } as ApiResponse<IBook>);
+      res.json({
+        success: true,
+        message: "Book retrieved successfully",
+        data: book as any,
+      } as ApiResponse<IBook>);
     } catch (error) {
       console.error("Get book error:", error);
       res.status(500).json({
@@ -312,11 +319,11 @@ export class BookController {
         "tags",
       ];
 
-              allowedUpdates.forEach((field) => {
-                if (updates[field] !== undefined) {
-                  (book as any)[field] = updates[field];
-                }
-              });
+      allowedUpdates.forEach((field) => {
+        if (updates[field] !== undefined) {
+          (book as any)[field] = updates[field];
+        }
+      });
 
       // Update metadata
       if (updates.title) book.metadata.title = updates.title;
@@ -327,11 +334,11 @@ export class BookController {
 
       await book.save();
 
-              res.json({
-                success: true,
-                message: "Book updated successfully",
-                data: book as any,
-              } as ApiResponse<IBook>);
+      res.json({
+        success: true,
+        message: "Book updated successfully",
+        data: book as any,
+      } as ApiResponse<IBook>);
     } catch (error) {
       console.error("Update book error:", error);
       res.status(500).json({
@@ -359,9 +366,9 @@ export class BookController {
         return;
       }
 
-      // Delete file from S3
-      const s3Service = getS3Service();
-      await s3Service.deleteFile(book.fileKey);
+      // Delete file from storage
+      const storageService = getStorageService();
+      await storageService.deleteFile(book.fileKey);
 
       // Mark book as deleted
       book.status = BookStatus.DELETED;
@@ -409,8 +416,8 @@ export class BookController {
         return;
       }
 
-      const s3Service = getS3Service();
-      const downloadUrl = await s3Service.generatePresignedDownloadUrl(
+      const storageService = getStorageService();
+      const downloadUrl = await storageService.generatePresignedDownloadUrl(
         book.fileKey,
         3600
       ); // 1 hour

@@ -32,6 +32,7 @@ import bookRoutes from "./routes/books";
 import integrationRoutes from "./routes/integrations";
 import arcRoutes from "./routes/arc";
 import deliveryRoutes from "./routes/deliveries";
+import fileRoutes from "./routes/files";
 import { setWebSocketManager } from "./controllers/auctionController";
 
 // Load environment variables
@@ -162,6 +163,7 @@ app.use("/api/books", bookRoutes);
 app.use("/api/integrations", integrationRoutes);
 app.use("/api/arc", arcRoutes);
 app.use("/api/deliveries", deliveryRoutes);
+app.use("/files", fileRoutes);
 
 // Error handling middleware
 app.use(notFound);
