@@ -6,11 +6,14 @@ import morgan from "morgan";
 import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
 import path from "path";
+import { createServer } from "http";
 
 import { connectDB } from "./config/database";
 import { errorHandler } from "./middleware/errorHandler";
 import { notFound } from "./middleware/notFound";
 import { createAdminUserFromEnv } from "./utils/createAdminUser";
+import WebSocketManager from "./services/websocketServer";
+import { AuctionScheduler } from "./services/auctionScheduler";
 
 // Import routes
 import authRoutes from "./routes/auth";
@@ -22,12 +25,22 @@ import subscriptionRoutes from "./routes/subscriptions";
 import webhookRoutes from "./routes/webhooks";
 import dashboardRoutes from "./routes/dashboard";
 import translationRoutes from "./routes/translation";
+import auctionRoutes from "./routes/auctions";
+import demoRoutes from "./routes/demo";
+import { setWebSocketManager } from "./controllers/auctionController";
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
+const server = createServer(app);
 const PORT = process.env.PORT || 5000;
+
+// Initialize WebSocket server
+const wsManager = new WebSocketManager(server);
+
+// Set WebSocket manager for auction controller
+setWebSocketManager(wsManager);
 
 // Security middleware
 app.use(helmet());
@@ -77,10 +90,14 @@ app.use((req, res, next) => {
   }
 });
 
-// CORS configuration - More permissive for development
+// CORS configuration - Locked to EPUB viewer origins in production
+const corsOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(",").map((origin) => origin.trim())
+  : true; // Allow all origins in development
+
 app.use(
   cors({
-    origin: true, // Allow all origins in development
+    origin: corsOrigins,
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: [
@@ -134,6 +151,8 @@ app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/webhooks", webhookRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/translation", translationRoutes);
+app.use("/api/auctions", auctionRoutes);
+app.use("/api/demo", demoRoutes);
 
 // Error handling middleware
 app.use(notFound);
@@ -149,10 +168,16 @@ const startServer = async () => {
     console.log("🔧 Setting up admin user...");
     await createAdminUserFromEnv();
 
-    app.listen(PORT, () => {
+    // Start auction scheduler
+    console.log("⏰ Starting auction scheduler...");
+    AuctionScheduler.start();
+
+    server.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📚 Environment: ${process.env.NODE_ENV}`);
       console.log(`🌐 Health check: http://localhost:${PORT}/health`);
+      console.log(`🔌 WebSocket server: ws://localhost:${PORT}/ws`);
+      console.log(`🏆 Auction system: Active with real data integration`);
     });
   } catch (error) {
     console.error("❌ Failed to start server:", error);
@@ -170,6 +195,27 @@ process.on("unhandledRejection", (err: Error) => {
 process.on("uncaughtException", (err: Error) => {
   console.error("Uncaught Exception:", err.message);
   process.exit(1);
+});
+
+// Graceful shutdown
+process.on("SIGTERM", () => {
+  console.log("SIGTERM received, shutting down gracefully");
+  AuctionScheduler.stop();
+  wsManager.cleanup();
+  server.close(() => {
+    console.log("Process terminated");
+    process.exit(0);
+  });
+});
+
+process.on("SIGINT", () => {
+  console.log("SIGINT received, shutting down gracefully");
+  AuctionScheduler.stop();
+  wsManager.cleanup();
+  server.close(() => {
+    console.log("Process terminated");
+    process.exit(0);
+  });
 });
 
 startServer();

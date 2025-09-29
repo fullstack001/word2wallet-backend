@@ -207,3 +207,117 @@ export interface SubjectQuery extends PaginationQuery {
   search?: string;
   isActive?: boolean;
 }
+
+// Auction Types
+export enum AuctionStatus {
+  SCHEDULED = "scheduled",
+  ACTIVE = "active",
+  PAUSED = "paused",
+  ENDED = "ended",
+  ENDED_NO_SALE = "ended_no_sale",
+  SOLD = "sold",
+  SOLD_BUY_NOW = "sold_buy_now",
+  SOLD_OFFER = "sold_offer",
+  CANCELLED = "cancelled",
+}
+
+export enum BidStatus {
+  PENDING = "pending",
+  ACCEPTED = "accepted",
+  REJECTED = "rejected",
+  OUTBID = "outbid",
+}
+
+export enum OfferStatus {
+  PENDING = "pending",
+  ACCEPTED = "accepted",
+  DECLINED = "declined",
+  EXPIRED = "expired",
+  COUNTERED = "countered",
+}
+
+export interface IAuction extends Document {
+  _id: string;
+  title: string;
+  description: string;
+  currency: string;
+  startingPrice: number;
+  reservePrice?: number;
+  buyNowPrice?: number;
+  currentBid?: number;
+  highBidder?: mongoose.Types.ObjectId;
+  status: AuctionStatus;
+  startTime: Date;
+  endTime: Date;
+  extendSeconds: number; // Anti-sniping extension
+  minIncrement: number;
+  images?: string[]; // Array of image URLs
+  bids: mongoose.Types.ObjectId[];
+  offers: mongoose.Types.ObjectId[];
+  createdBy: mongoose.Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface IBid extends Document {
+  _id: string;
+  auction: mongoose.Types.ObjectId;
+  bidder: mongoose.Types.ObjectId;
+  amount: number;
+  status: BidStatus;
+  timestamp: Date;
+  ipAddress: string;
+  userAgent?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface IOffer extends Document {
+  _id: string;
+  auction: mongoose.Types.ObjectId;
+  buyer: mongoose.Types.ObjectId;
+  amount: number;
+  status: OfferStatus;
+  expiresAt: Date;
+  counterOffer?: mongoose.Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Auction Snapshot for API responses
+export interface AuctionSnapshot {
+  id: string;
+  title: string;
+  currency: string;
+  highBid: number;
+  leader: {
+    id: string;
+    name: string;
+  } | null;
+  online: number;
+  start: Date;
+  end: Date;
+  reserveMet: boolean;
+  status: AuctionStatus;
+  buyNowPrice?: number;
+  timeRemaining: number;
+}
+
+// WebSocket Message Types
+export interface WSMessage {
+  type: "snapshot" | "bid_update" | "offer_update" | "error" | "pong";
+  data: any;
+  auctionId: string;
+}
+
+export interface BidRequest {
+  amount: number;
+}
+
+export interface OfferRequest {
+  amount: number;
+}
+
+export interface CounterOfferRequest {
+  amount: number;
+}
