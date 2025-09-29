@@ -32,7 +32,7 @@ export const translateTextValidation = [
 export const translateHtmlValidation = [
   body("htmlContent")
     .trim()
-    .isLength({ min: 1, max: 50000 })
+    .isLength({ min: 1, max: 100000 })
     .withMessage(
       "HTML content is required and must be between 1 and 50,000 characters"
     ),
@@ -60,6 +60,6 @@ export const translateHtmlValidation = [
 export const detectLanguageValidation = [
   body("text")
     .trim()
-    .isLength({ min: 1, max: 5000 })
+    .isLength({ min: 1, max: 10000 })
     .withMessage("Text is required and must be between 1 and 5,000 characters"),
 ];

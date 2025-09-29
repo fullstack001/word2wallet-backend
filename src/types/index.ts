@@ -114,14 +114,25 @@ export interface ICourseModel extends mongoose.Model<ICourse> {
 
 export interface EpubMetadata {
   title: string;
-  author: string;
-  publisher?: string;
-  language: string;
+  creator: string;
+  subject?: string;
   description?: string;
+  publisher?: string;
+  date?: string;
+  language?: string;
+  rights?: string;
+  identifier?: string;
+  format?: string;
+  source?: string;
+  relation?: string;
+  coverage?: string;
+  contributor?: string;
+  type?: string;
   coverImage?: string;
   totalPages?: number;
   fileSize?: number;
   lastModified?: Date;
+  wordCount?: number;
 }
 
 export interface MultimediaContent {
@@ -320,4 +331,214 @@ export interface OfferRequest {
 
 export interface CounterOfferRequest {
   amount: number;
+}
+
+// Book Management Types
+export interface IBook extends Document {
+  _id: string;
+  userId: string;
+  title: string;
+  author: string;
+  description?: string;
+  isbn?: string;
+  publisher?: string;
+  publicationDate?: Date;
+  language: string;
+  genre?: string[];
+  tags?: string[];
+  fileKey: string;
+  fileName: string;
+  fileSize: number;
+  checksum: string;
+  metadata: {
+    title: string;
+    creator: string;
+    subject?: string;
+    description?: string;
+    publisher?: string;
+    date?: string;
+    language?: string;
+    rights?: string;
+    identifier?: string;
+    format?: string;
+    source?: string;
+    relation?: string;
+    coverage?: string;
+    contributor?: string;
+    type?: string;
+    // BookFunnel specific fields
+    bookFunnelUploadId?: string;
+    bookFunnelUploadStatus?: string;
+    bookFunnelDownloadUrl?: string;
+    bookFunnelErrorMessage?: string;
+    bookFunnelCampaignId?: string;
+    bookFunnelCampaignStatus?: string;
+    bookFunnelCampaignName?: string;
+    bookFunnelDownloadCount?: number;
+  };
+  status: BookStatus;
+  uploadDate: Date;
+  lastModified: Date;
+  coverImageUrl?: string;
+  pageCount?: number;
+  wordCount?: number;
+  readingTime?: number;
+  fileUrl: string;
+}
+
+export enum BookStatus {
+  UPLOADING = "uploading",
+  PROCESSING = "processing",
+  READY = "ready",
+  ERROR = "error",
+  DELETED = "deleted",
+}
+
+// Integration Types
+export interface IIntegration extends Document {
+  _id: string;
+  userId: string;
+  provider: IntegrationProvider;
+  apiKey: string;
+  status: IntegrationStatus;
+  settings?: {
+    [key: string]: any;
+  };
+  lastSync?: Date;
+  errorMessage?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  decryptedApiKey: string;
+  updateLastSync(): Promise<IIntegration>;
+  setError(errorMessage: string): Promise<IIntegration>;
+  clearError(): Promise<IIntegration>;
+}
+
+export enum IntegrationProvider {
+  BOOKFUNNEL = "bookfunnel",
+  AMAZON_KDP = "amazon_kdp",
+  DRAFT2DIGITAL = "draft2digital",
+  SMASHWORDS = "smashwords",
+}
+
+export enum IntegrationStatus {
+  ACTIVE = "active",
+  INACTIVE = "inactive",
+  ERROR = "error",
+  PENDING = "pending",
+}
+
+// ARC Link Types
+export interface IArcLink extends Document {
+  _id: string;
+  bookId: string;
+  userId: string;
+  code: string;
+  url: string;
+  campaignId?: string;
+  expiresAt?: Date;
+  maxDownloads?: number;
+  downloadsCount: number;
+  status: ArcLinkStatus;
+  metadata: {
+    title: string;
+    author: string;
+    format: string;
+    description?: string;
+  };
+  createdAt: Date;
+  updatedAt: Date;
+  isExpired: boolean;
+  isMaxDownloadsReached: boolean;
+  isAccessible: boolean;
+  incrementDownload(): Promise<IArcLink>;
+  checkStatus(): Promise<IArcLink>;
+}
+
+export enum ArcLinkStatus {
+  ACTIVE = "active",
+  EXPIRED = "expired",
+  MAX_DOWNLOADS_REACHED = "max_downloads_reached",
+  DISABLED = "disabled",
+  ERROR = "error",
+}
+
+// Job Types
+export interface IJob extends Document {
+  _id: string;
+  type: JobType;
+  status: JobStatus;
+  userId: string;
+  bookId?: string;
+  arcLinkId?: string;
+  progress: number;
+  data: {
+    [key: string]: any;
+  };
+  result?: {
+    [key: string]: any;
+  };
+  error?: {
+    message: string;
+    stack?: string;
+    code?: string;
+  };
+  attempts: number;
+  maxAttempts: number;
+  nextRetryAt?: Date;
+  completedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  canRetry: boolean;
+  isInProgress: boolean;
+  updateProgress(progress: number): Promise<IJob>;
+  markProcessing(): Promise<IJob>;
+  markCompleted(result?: any): Promise<IJob>;
+  markFailed(error: {
+    message: string;
+    stack?: string;
+    code?: string;
+  }): Promise<IJob>;
+  cancel(): Promise<IJob>;
+}
+
+export enum JobType {
+  EPUB_VALIDATION = "epub_validation",
+  EPUB_PACKAGING = "epub_packaging",
+  BOOKFUNNEL_UPLOAD = "bookfunnel_upload",
+  ARC_CAMPAIGN_CREATE = "arc_campaign_create",
+  ARC_CODES_GENERATE = "arc_codes_generate",
+  BOOKFUNNEL_SYNC = "bookfunnel_sync",
+}
+
+export enum JobStatus {
+  PENDING = "pending",
+  PROCESSING = "processing",
+  COMPLETED = "completed",
+  FAILED = "failed",
+  RETRYING = "retrying",
+  CANCELLED = "cancelled",
+}
+
+// Book Query Types
+export interface BookQuery extends PaginationQuery {
+  search?: string;
+  status?: BookStatus;
+  genre?: string;
+  language?: string;
+  author?: string;
+}
+
+// ARC Link Query Types
+export interface ArcLinkQuery extends PaginationQuery {
+  bookId?: string;
+  status?: ArcLinkStatus;
+  expired?: boolean;
+}
+
+// Job Query Types
+export interface JobQuery extends PaginationQuery {
+  type?: JobType;
+  status?: JobStatus;
+  bookId?: string;
 }

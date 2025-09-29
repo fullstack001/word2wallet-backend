@@ -38,7 +38,7 @@ const epubMetadataSchema = new Schema<EpubMetadata>(
       type: String,
       required: true,
     },
-    author: {
+    creator: {
       type: String,
       required: true,
     },

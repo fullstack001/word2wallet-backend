@@ -7,7 +7,7 @@ import { AuthRequest } from "../types";
 /**
  * Middleware to authenticate JWT token
  */
-export const authenticate = async (
+export const auth = async (
   req: AuthRequest,
   res: Response,
   next: NextFunction
@@ -54,6 +54,9 @@ export const authenticate = async (
     });
   }
 };
+
+// Export authenticate as an alias for auth
+export const authenticate = auth;
 
 /**
  * Middleware to check if user has required role

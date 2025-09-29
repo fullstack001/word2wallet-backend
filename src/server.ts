@@ -14,6 +14,7 @@ import { notFound } from "./middleware/notFound";
 import { createAdminUserFromEnv } from "./utils/createAdminUser";
 import WebSocketManager from "./services/websocketServer";
 import { AuctionScheduler } from "./services/auctionScheduler";
+import { initializeWorkers } from "./services/jobService";
 
 // Import routes
 import authRoutes from "./routes/auth";
@@ -27,6 +28,10 @@ import dashboardRoutes from "./routes/dashboard";
 import translationRoutes from "./routes/translation";
 import auctionRoutes from "./routes/auctions";
 import demoRoutes from "./routes/demo";
+import bookRoutes from "./routes/books";
+import integrationRoutes from "./routes/integrations";
+import arcRoutes from "./routes/arc";
+import deliveryRoutes from "./routes/deliveries";
 import { setWebSocketManager } from "./controllers/auctionController";
 
 // Load environment variables
@@ -153,6 +158,10 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/translation", translationRoutes);
 app.use("/api/auctions", auctionRoutes);
 app.use("/api/demo", demoRoutes);
+app.use("/api/books", bookRoutes);
+app.use("/api/integrations", integrationRoutes);
+app.use("/api/arc", arcRoutes);
+app.use("/api/deliveries", deliveryRoutes);
 
 // Error handling middleware
 app.use(notFound);
@@ -171,6 +180,10 @@ const startServer = async () => {
     // Start auction scheduler
     console.log("⏰ Starting auction scheduler...");
     AuctionScheduler.start();
+
+    // Initialize job workers
+    console.log("🔧 Initializing job workers...");
+    initializeWorkers();
 
     server.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);

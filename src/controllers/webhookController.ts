@@ -1,8 +1,15 @@
 import { Request, Response, NextFunction } from "express";
+import crypto from "crypto";
 import { User } from "../models/User";
 import { StripeService } from "../services/stripeService";
 import { EmailService } from "../services/emailService";
 import { CustomError } from "../middleware/errorHandler";
+import { Book } from "../models/Book";
+import { ArcLink } from "../models/ArcLink";
+import { Job } from "../models/Job";
+import { Integration } from "../models/Integration";
+import { IntegrationProvider, BookStatus, ArcLinkStatus } from "../types";
+import { ApiResponse } from "../types";
 
 export class WebhookController {
   /**
@@ -577,6 +584,377 @@ export class WebhookController {
       // You can add logic here to handle expired checkout sessions
     } catch (error) {
       console.error("Error handling checkout session expired:", error);
+    }
+  }
+
+  // ==================== BOOKFUNNEL WEBHOOK METHODS ====================
+
+  /**
+   * Handle BookFunnel webhooks
+   */
+  static async handleBookFunnelWebhook(
+    req: Request,
+    res: Response
+  ): Promise<void> {
+    try {
+      // Verify webhook signature
+      const signature = req.headers["x-bookfunnel-signature"] as string;
+      const webhookSecret = process.env.BOOKFUNNEL_WEBHOOK_SECRET;
+
+      if (!webhookSecret) {
+        console.error("BookFunnel webhook secret not configured");
+        res.status(500).json({
+          success: false,
+          message: "Webhook secret not configured",
+        } as ApiResponse);
+        return;
+      }
+
+      if (!signature) {
+        res.status(400).json({
+          success: false,
+          message: "Missing webhook signature",
+        } as ApiResponse);
+        return;
+      }
+
+      // Verify signature
+      const body = JSON.stringify(req.body);
+      const expectedSignature = crypto
+        .createHmac("sha256", webhookSecret)
+        .update(body)
+        .digest("hex");
+
+      if (signature !== expectedSignature) {
+        res.status(401).json({
+          success: false,
+          message: "Invalid webhook signature",
+        } as ApiResponse);
+        return;
+      }
+
+      const { event, data } = req.body;
+
+      console.log(`BookFunnel webhook received: ${event}`, data);
+
+      // Handle different webhook events
+      switch (event) {
+        case "upload.completed":
+          await WebhookController.handleBookFunnelUploadCompleted(data);
+          break;
+        case "upload.failed":
+          await WebhookController.handleBookFunnelUploadFailed(data);
+          break;
+        case "campaign.created":
+          await WebhookController.handleBookFunnelCampaignCreated(data);
+          break;
+        case "campaign.updated":
+          await WebhookController.handleBookFunnelCampaignUpdated(data);
+          break;
+        case "arc_code.downloaded":
+          await WebhookController.handleBookFunnelArcCodeDownloaded(data);
+          break;
+        case "arc_code.expired":
+          await WebhookController.handleBookFunnelArcCodeExpired(data);
+          break;
+        default:
+          console.log(`Unhandled BookFunnel webhook event: ${event}`);
+      }
+
+      res.json({
+        success: true,
+        message: "Webhook processed successfully",
+      } as ApiResponse);
+    } catch (error) {
+      console.error("BookFunnel webhook error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to process webhook",
+        error: error instanceof Error ? error.message : "Unknown error",
+      } as ApiResponse);
+    }
+  }
+
+  /**
+   * Handle BookFunnel upload completed event
+   */
+  private static async handleBookFunnelUploadCompleted(
+    data: any
+  ): Promise<void> {
+    try {
+      const { upload_id, status, download_url } = data;
+
+      // Find book with this upload ID
+      const book = await Book.findOne({
+        "metadata.bookFunnelUploadId": upload_id,
+      });
+
+      if (!book) {
+        console.warn(`Book not found for upload ID: ${upload_id}`);
+        return;
+      }
+
+      // Update book metadata
+      book.metadata = {
+        ...book.metadata,
+        bookFunnelUploadStatus: status,
+        bookFunnelDownloadUrl: download_url,
+      };
+
+      await book.save();
+
+      // Update related job
+      const job = await Job.findOne({
+        bookId: book._id,
+        type: "bookfunnel_upload",
+      });
+
+      if (job) {
+        await (job as any).markCompleted({
+          uploadId: upload_id,
+          status,
+          downloadUrl: download_url,
+        });
+      }
+
+      console.log(`Upload completed for book: ${book._id}`);
+    } catch (error) {
+      console.error("Error handling upload completed:", error);
+    }
+  }
+
+  /**
+   * Handle BookFunnel upload failed event
+   */
+  private static async handleBookFunnelUploadFailed(data: any): Promise<void> {
+    try {
+      const { upload_id, error_message } = data;
+
+      // Find book with this upload ID
+      const book = await Book.findOne({
+        "metadata.bookFunnelUploadId": upload_id,
+      });
+
+      if (!book) {
+        console.warn(`Book not found for upload ID: ${upload_id}`);
+        return;
+      }
+
+      // Update book status
+      book.status = BookStatus.ERROR;
+      await book.save();
+
+      // Update related job
+      const job = await Job.findOne({
+        bookId: book._id,
+        type: "bookfunnel_upload",
+      });
+
+      if (job) {
+        await (job as any).markFailed({
+          message: error_message || "Upload failed",
+          code: "UPLOAD_FAILED",
+        });
+      }
+
+      console.log(
+        `Upload failed for book: ${book._id}, error: ${error_message}`
+      );
+    } catch (error) {
+      console.error("Error handling upload failed:", error);
+    }
+  }
+
+  /**
+   * Handle BookFunnel campaign created event
+   */
+  private static async handleBookFunnelCampaignCreated(
+    data: any
+  ): Promise<void> {
+    try {
+      const { campaign_id, name, status } = data;
+
+      // Find book with this campaign ID
+      const book = await Book.findOne({
+        "metadata.bookFunnelCampaignId": campaign_id,
+      });
+
+      if (!book) {
+        console.warn(`Book not found for campaign ID: ${campaign_id}`);
+        return;
+      }
+
+      // Update book metadata
+      book.metadata = {
+        ...book.metadata,
+        bookFunnelCampaignStatus: status,
+        bookFunnelCampaignName: name,
+      };
+
+      await book.save();
+
+      // Update related job
+      const job = await Job.findOne({
+        bookId: book._id,
+        type: "arc_campaign_create",
+      });
+
+      if (job) {
+        await (job as any).markCompleted({
+          campaignId: campaign_id,
+          name,
+          status,
+        });
+      }
+
+      console.log(`Campaign created for book: ${book._id}`);
+    } catch (error) {
+      console.error("Error handling campaign created:", error);
+    }
+  }
+
+  /**
+   * Handle BookFunnel campaign updated event
+   */
+  private static async handleBookFunnelCampaignUpdated(
+    data: any
+  ): Promise<void> {
+    try {
+      const { campaign_id, status, download_count } = data;
+
+      // Find book with this campaign ID
+      const book = await Book.findOne({
+        "metadata.bookFunnelCampaignId": campaign_id,
+      });
+
+      if (!book) {
+        console.warn(`Book not found for campaign ID: ${campaign_id}`);
+        return;
+      }
+
+      // Update book metadata
+      book.metadata = {
+        ...book.metadata,
+        bookFunnelCampaignStatus: status,
+        bookFunnelDownloadCount: download_count,
+      };
+
+      await book.save();
+
+      console.log(`Campaign updated for book: ${book._id}`);
+    } catch (error) {
+      console.error("Error handling campaign updated:", error);
+    }
+  }
+
+  /**
+   * Handle BookFunnel ARC code downloaded event
+   */
+  private static async handleBookFunnelArcCodeDownloaded(
+    data: any
+  ): Promise<void> {
+    try {
+      const { code, download_count } = data;
+
+      // Find ARC link with this code
+      const arcLink = await ArcLink.findOne({ code });
+      if (!arcLink) {
+        console.warn(`ARC link not found for code: ${code}`);
+        return;
+      }
+
+      // Update download count
+      arcLink.downloadsCount = download_count;
+
+      // Check if max downloads reached
+      if (
+        arcLink.maxDownloads &&
+        arcLink.downloadsCount >= arcLink.maxDownloads
+      ) {
+        arcLink.status = ArcLinkStatus.MAX_DOWNLOADS_REACHED;
+      }
+
+      await arcLink.save();
+
+      console.log(`ARC code downloaded: ${code}, count: ${download_count}`);
+    } catch (error) {
+      console.error("Error handling ARC code downloaded:", error);
+    }
+  }
+
+  /**
+   * Handle BookFunnel ARC code expired event
+   */
+  private static async handleBookFunnelArcCodeExpired(
+    data: any
+  ): Promise<void> {
+    try {
+      const { code } = data;
+
+      // Find ARC link with this code
+      const arcLink = await ArcLink.findOne({ code });
+      if (!arcLink) {
+        console.warn(`ARC link not found for code: ${code}`);
+        return;
+      }
+
+      // Update status
+      arcLink.status = ArcLinkStatus.EXPIRED;
+      await arcLink.save();
+
+      console.log(`ARC code expired: ${code}`);
+    } catch (error) {
+      console.error("Error handling ARC code expired:", error);
+    }
+  }
+
+  /**
+   * Handle generic webhook (for testing)
+   */
+  static async handleGenericWebhook(
+    req: Request,
+    res: Response
+  ): Promise<void> {
+    try {
+      console.log("Generic webhook received:", req.body);
+
+      res.json({
+        success: true,
+        message: "Webhook received successfully",
+        data: req.body,
+      } as ApiResponse);
+    } catch (error) {
+      console.error("Generic webhook error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to process webhook",
+        error: error instanceof Error ? error.message : "Unknown error",
+      } as ApiResponse);
+    }
+  }
+
+  /**
+   * Verify webhook endpoint (for BookFunnel webhook verification)
+   */
+  static async verifyWebhook(req: Request, res: Response): Promise<void> {
+    try {
+      const { challenge } = req.query;
+
+      if (challenge) {
+        res.send(challenge);
+      } else {
+        res.status(400).json({
+          success: false,
+          message: "Missing challenge parameter",
+        } as ApiResponse);
+      }
+    } catch (error) {
+      console.error("Webhook verification error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to verify webhook",
+        error: error instanceof Error ? error.message : "Unknown error",
+      } as ApiResponse);
     }
   }
 }

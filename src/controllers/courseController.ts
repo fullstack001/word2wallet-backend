@@ -343,7 +343,7 @@ export class CourseController {
         course.epubFile = `uploads/epubs/${course._id}.epub`;
         course.epubMetadata = {
           title: course.title,
-          author: `${user.firstName} ${user.lastName}`,
+          creator: `${user.firstName} ${user.lastName}`,
           language: "en",
           description: course.description,
           coverImage: course.epubCover,
@@ -649,7 +649,7 @@ export class CourseController {
           updatedCourse.epubFile = `uploads/epubs/${updatedCourse._id}.epub`;
           updatedCourse.epubMetadata = {
             title: updatedCourse.title,
-            author: authorName,
+            creator: authorName,
             language: "en",
             description: updatedCourse.description,
             coverImage: updatedCourse.epubCover,
