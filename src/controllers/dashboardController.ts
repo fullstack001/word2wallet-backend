@@ -29,7 +29,7 @@ export class DashboardController {
         .populate("subject", "name")
         .populate("createdBy", "firstName lastName")
         .sort({ createdAt: -1 })
-        .limit(10)
+        .limit(100)
         .lean(); // Use lean() for better performance
 
       // Calculate user-specific stats

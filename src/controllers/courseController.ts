@@ -16,7 +16,7 @@ export class CourseController {
     try {
       const {
         page = 1,
-        limit = 10,
+        limit = 100,
         subject,
         search,
         isPublished: isPublishedStr,

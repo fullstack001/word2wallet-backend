@@ -12,7 +12,7 @@ export class SubjectController {
     try {
       const {
         page = 1,
-        limit = 10,
+        limit = 100,
         search,
         isActive,
         sort = "name",
