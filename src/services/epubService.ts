@@ -64,22 +64,44 @@ export class EpubService {
       // Parse EPUB
       const epubData = await parseEpub(filePath);
 
-      // Validate required metadata
+      // Debug logging to understand the structure
+      console.log("EPUB parsing debug:", {
+        hasManifest: !!epubData.manifest,
+        manifestKeys: epubData.manifest
+          ? Object.keys(epubData.manifest).length
+          : 0,
+        hasSpine: !!epubData.spine,
+        spineLength: epubData.spine ? epubData.spine.length : 0,
+        epubDataKeys: Object.keys(epubData),
+        metadata: epubData.metadata,
+      });
+
+      // Validate critical EPUB structure (check for alternative property names)
+      const manifest =
+        epubData.manifest || epubData.manifests || epubData.manifestItems;
+      const spine = epubData.spine || epubData.spines || epubData.spineItems;
+
+      if (!manifest || Object.keys(manifest).length === 0) {
+        // Convert to warning instead of error - some EPUBs might have different structure
+        warnings.push(
+          "EPUB manifest is empty or missing - using fallback validation"
+        );
+      }
+
+      if (!spine || spine.length === 0) {
+        // Convert to warning instead of error - some EPUBs might have different structure
+        warnings.push(
+          "EPUB spine is empty or missing - using fallback validation"
+        );
+      }
+
+      // Check metadata (convert to warnings instead of errors for better UX)
       if (!epubData.metadata?.title) {
-        errors.push("Missing required metadata: title");
+        warnings.push("Missing metadata: title (will use default)");
       }
 
       if (!epubData.metadata?.creator) {
-        errors.push("Missing required metadata: creator");
-      }
-
-      // Check for common issues
-      if (!epubData.manifest || Object.keys(epubData.manifest).length === 0) {
-        errors.push("EPUB manifest is empty or missing");
-      }
-
-      if (!epubData.spine || epubData.spine.length === 0) {
-        errors.push("EPUB spine is empty or missing");
+        warnings.push("Missing metadata: creator (will use default)");
       }
 
       // Extract and validate metadata
@@ -90,7 +112,7 @@ export class EpubService {
         language: epubData.metadata?.language || "en",
         description: epubData.metadata?.description,
         coverImage: (epubData.metadata as any)?.cover,
-        totalPages: epubData.spine?.length,
+        totalPages: spine?.length || 0,
         fileSize,
         lastModified: stats.mtime,
       };

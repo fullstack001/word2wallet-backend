@@ -4,7 +4,7 @@ import { body } from "express-validator";
 export const translateTextValidation = [
   body("text")
     .trim()
-    .isLength({ min: 1, max: 10000 })
+    .isLength({ min: 1, max: 100000 })
     .withMessage(
       "Text is required and must be between 1 and 10,000 characters"
     ),
@@ -32,9 +32,9 @@ export const translateTextValidation = [
 export const translateHtmlValidation = [
   body("htmlContent")
     .trim()
-    .isLength({ min: 1, max: 100000 })
+    .isLength({ min: 1, max: 1000000 })
     .withMessage(
-      "HTML content is required and must be between 1 and 50,000 characters"
+      "HTML content is required and must be between 1 and 100,000 characters"
     ),
 
   body("targetLanguage")

@@ -136,10 +136,7 @@ export class BookController {
         }
       );
 
-      // Clean up temp file
-      await EpubService.cleanupTempFile(req.file.path);
-
-      // Start validation job
+      // Start validation job (cleanup will be handled in the job processor)
       await JobService.addJob(JobType.EPUB_VALIDATION, {
         jobId: book._id,
         bookId: book._id,
@@ -157,7 +154,11 @@ export class BookController {
 
       // Clean up temp file if it exists
       if (req.file?.path) {
-        await EpubService.cleanupTempFile(req.file.path);
+        try {
+          await EpubService.cleanupTempFile(req.file.path);
+        } catch (cleanupError) {
+          console.warn("Failed to cleanup temp file:", cleanupError);
+        }
       }
 
       res.status(500).json({

@@ -190,7 +190,7 @@ export class TranslationController {
       }
 
       // Check content size to prevent timeouts
-      if (htmlContent.length > 50000) {
+      if (htmlContent.length > 100000) {
         return res.status(400).json({
           success: false,
           message:
@@ -199,7 +199,7 @@ export class TranslationController {
       }
 
       // For very large content, suggest chunking
-      if (htmlContent.length > 30000) {
+      if (htmlContent.length > 100000) {
         console.log("⚠️ Large content detected, translation may take longer");
       }
 

@@ -316,9 +316,16 @@ export interface AuctionSnapshot {
 
 // WebSocket Message Types
 export interface WSMessage {
-  type: "snapshot" | "bid_update" | "offer_update" | "error" | "pong";
+  type:
+    | "snapshot"
+    | "bid_update"
+    | "offer_update"
+    | "error"
+    | "pong"
+    | "book_status_update";
   data: any;
-  auctionId: string;
+  auctionId?: string;
+  bookId?: string;
 }
 
 export interface BidRequest {

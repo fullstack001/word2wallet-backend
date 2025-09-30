@@ -220,6 +220,14 @@ export class JobProcessors {
         metadata: validationResult.metadata,
       });
 
+      // Clean up temp file after successful validation
+      try {
+        await EpubService.cleanupTempFile(filePath);
+      } catch (cleanupError) {
+        console.warn("Failed to cleanup temp file:", cleanupError);
+        // Don't fail the job for cleanup errors
+      }
+
       return validationResult;
     } catch (error) {
       const jobRecord = await JobModel.findById(jobId);
@@ -229,6 +237,22 @@ export class JobProcessors {
           stack: error instanceof Error ? error.stack : undefined,
         });
       }
+
+      // Only clean up temp file if this is the final attempt (no more retries)
+      const isFinalAttempt =
+        jobRecord && jobRecord.attempts >= jobRecord.maxAttempts;
+      if (isFinalAttempt) {
+        try {
+          await EpubService.cleanupTempFile(filePath);
+        } catch (cleanupError) {
+          console.warn(
+            "Failed to cleanup temp file after final error:",
+            cleanupError
+          );
+          // Don't fail the job for cleanup errors
+        }
+      }
+
       throw error;
     }
   }

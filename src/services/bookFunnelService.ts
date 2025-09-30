@@ -106,7 +106,11 @@ export class BookFunnelService {
    */
   async testConnection(): Promise<boolean> {
     try {
-      const response = await this.api.get("/account");
+      // Try to get campaigns list as a connection test
+      // This is more reliable than /account which might not exist
+      const response = await this.api.get("/campaigns", {
+        params: { limit: 1 },
+      });
       return response.status === 200;
     } catch (error) {
       console.error("BookFunnel connection test failed:", error);
@@ -116,11 +120,22 @@ export class BookFunnelService {
 
   /**
    * Get account information
+   * Note: BookFunnel API doesn't have a dedicated /account endpoint
+   * This method returns basic info derived from campaigns
    */
   async getAccountInfo(): Promise<any> {
     try {
-      const response = await this.api.get("/account");
-      return response.data;
+      // Since /account doesn't exist, we'll get campaigns info as a proxy for account info
+      const response = await this.api.get("/campaigns", {
+        params: { limit: 1 },
+      });
+
+      // Return basic account info structure
+      return {
+        connected: true,
+        campaigns_count: response.data?.length || 0,
+        status: "active",
+      };
     } catch (error) {
       throw new Error(
         `Failed to get account info: ${
