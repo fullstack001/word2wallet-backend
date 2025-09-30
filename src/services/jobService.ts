@@ -18,21 +18,30 @@ import { EpubService } from "./epubService";
 import { getS3Service } from "./s3Service";
 import { createBookFunnelService } from "./bookFunnelService";
 
-// Redis connection
-const redis = new IORedis({
-  host: process.env.REDIS_HOST || "localhost",
-  port: parseInt(process.env.REDIS_PORT || "6379"),
-  password: process.env.REDIS_PASSWORD,
-  maxRetriesPerRequest: null,
-});
+// Redis connection - will be initialized after dotenv config
+let redis: IORedis;
 
 // Job queues
 const jobQueues = new Map<JobType, Queue>();
 
+// Initialize Redis connection
+const initializeRedis = () => {
+  if (!redis) {
+    redis = new IORedis({
+      host: process.env.REDIS_HOST || "localhost",
+      port: parseInt(process.env.REDIS_PORT || "6379"),
+      password: process.env.REDIS_PASSWORD,
+      maxRetriesPerRequest: null,
+    });
+  }
+  return redis;
+};
+
 // Initialize queues
-const initializeQueues = () => {
+export const initializeQueues = () => {
+  const redisConnection = initializeRedis();
   const queueConfig = {
-    connection: redis,
+    connection: redisConnection,
     defaultJobOptions: {
       removeOnComplete: 100,
       removeOnFail: 50,
@@ -51,8 +60,7 @@ const initializeQueues = () => {
   });
 };
 
-// Initialize queues on startup
-initializeQueues();
+// Note: Queues will be initialized by calling initializeQueues() after dotenv.config()
 
 export class JobService {
   /**
@@ -501,8 +509,10 @@ export class JobProcessors {
 
 // Initialize workers
 export const initializeWorkers = () => {
+  const redisConnection = initializeRedis();
+
   // Check Redis version compatibility first
-  redis
+  redisConnection
     .info()
     .then((info) => {
       const versionMatch = info.match(/redis_version:(\d+\.\d+\.\d+)/);
@@ -523,7 +533,7 @@ export const initializeWorkers = () => {
 
       // Initialize workers only if Redis is compatible
       const workerConfig = {
-        connection: redis,
+        connection: redisConnection,
         concurrency: 5,
       };
 
@@ -578,5 +588,4 @@ export const initializeWorkers = () => {
     });
 };
 
-// Initialize workers on startup
-initializeWorkers();
+// Note: Workers will be initialized by calling initializeWorkers() after dotenv.config()

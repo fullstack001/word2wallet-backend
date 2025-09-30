@@ -14,7 +14,7 @@ import { notFound } from "./middleware/notFound";
 import { createAdminUserFromEnv } from "./utils/createAdminUser";
 import WebSocketManager from "./services/websocketServer";
 import { AuctionScheduler } from "./services/auctionScheduler";
-import { initializeWorkers } from "./services/jobService";
+import { initializeWorkers, initializeQueues } from "./services/jobService";
 
 // Import routes
 import authRoutes from "./routes/auth";
@@ -37,6 +37,10 @@ import { setWebSocketManager } from "./controllers/auctionController";
 
 // Load environment variables
 dotenv.config();
+
+// Initialize Redis-dependent services after environment variables are loaded
+initializeQueues();
+initializeWorkers();
 
 const app = express();
 const server = createServer(app);
