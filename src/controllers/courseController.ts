@@ -239,11 +239,6 @@ export class CourseController {
         req.files.cover[0]
       ) {
         coverImagePath = req.files.cover[0].path;
-        console.log("📸 Cover image uploaded:", coverImagePath);
-      } else {
-        console.log("📸 No cover image provided");
-        console.log("📸 req.files:", req.files);
-        console.log("📸 req.file:", req.file);
       }
 
       // Handle multimedia files if present

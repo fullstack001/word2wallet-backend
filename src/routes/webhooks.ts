@@ -10,13 +10,4 @@ router.post(
   WebhookController.handleWebhook
 );
 
-// BookFunnel webhook endpoint
-router.post("/bookfunnel", WebhookController.handleBookFunnelWebhook);
-
-// Generic webhook endpoint (for testing)
-router.post("/generic", WebhookController.handleGenericWebhook);
-
-// Webhook verification endpoint (for BookFunnel)
-router.get("/verify", WebhookController.verifyWebhook);
-
 export default router;

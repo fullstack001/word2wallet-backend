@@ -30,10 +30,6 @@ export interface IJob {
 export enum JobType {
   EPUB_VALIDATION = "epub_validation",
   EPUB_PACKAGING = "epub_packaging",
-  BOOKFUNNEL_UPLOAD = "bookfunnel_upload",
-  ARC_CAMPAIGN_CREATE = "arc_campaign_create",
-  ARC_CODES_GENERATE = "arc_codes_generate",
-  BOOKFUNNEL_SYNC = "bookfunnel_sync",
 }
 
 export enum JobStatus {

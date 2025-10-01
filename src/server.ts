@@ -29,9 +29,6 @@ import translationRoutes from "./routes/translation";
 import auctionRoutes from "./routes/auctions";
 import demoRoutes from "./routes/demo";
 import bookRoutes from "./routes/books";
-import integrationRoutes from "./routes/integrations";
-import arcRoutes from "./routes/arc";
-import deliveryRoutes from "./routes/deliveries";
 import fileRoutes from "./routes/files";
 import { setWebSocketManager } from "./controllers/auctionController";
 
@@ -44,7 +41,7 @@ initializeWorkers();
 
 const app = express();
 const server = createServer(app);
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5000; // Server port
 
 // Initialize WebSocket server
 const wsManager = new WebSocketManager(server);
@@ -164,9 +161,6 @@ app.use("/api/translation", translationRoutes);
 app.use("/api/auctions", auctionRoutes);
 app.use("/api/demo", demoRoutes);
 app.use("/api/books", bookRoutes);
-app.use("/api/integrations", integrationRoutes);
-app.use("/api/arc", arcRoutes);
-app.use("/api/deliveries", deliveryRoutes);
 app.use("/files", fileRoutes);
 
 // Error handling middleware

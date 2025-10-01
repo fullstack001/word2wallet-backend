@@ -16,7 +16,6 @@ import { ArcLink } from "../models/ArcLink";
 import { Integration } from "../models/Integration";
 import { EpubService } from "./epubService";
 import { getS3Service } from "./s3Service";
-import { createBookFunnelService } from "./bookFunnelService";
 
 // Redis connection - will be initialized after dotenv config
 let redis: IORedis;
@@ -136,7 +135,7 @@ export class JobService {
       }
 
       // Cancel in queue
-      const queue = jobQueues.get(jobRecord.type);
+      const queue = jobQueues.get(jobRecord.type as JobType);
       if (queue) {
         await queue.remove(jobId);
       }
@@ -307,228 +306,6 @@ export class JobProcessors {
       throw error;
     }
   }
-
-  /**
-   * BookFunnel Upload Processor
-   */
-  static async processBookFunnelUpload(job: Job): Promise<any> {
-    const { jobId, bookId, userId } = job.data;
-
-    try {
-      const jobRecord = await JobModel.findById(jobId);
-      if (!jobRecord) {
-        throw new Error("Job record not found");
-      }
-
-      await (jobRecord as any).markProcessing();
-      await (jobRecord as any).updateProgress(10);
-
-      // Get book and integration
-      const book = await Book.findById(bookId);
-      if (!book) {
-        throw new Error("Book not found");
-      }
-
-      const integration = await (Integration as any).findActiveByProvider(
-        userId,
-        IntegrationProvider.BOOKFUNNEL
-      );
-      if (!integration) {
-        throw new Error("BookFunnel integration not found or inactive");
-      }
-
-      await (jobRecord as any).updateProgress(20);
-
-      // Download file from S3
-      const s3Service = getS3Service();
-      const fileBuffer = await s3Service.downloadFile(book.fileKey);
-
-      await (jobRecord as any).updateProgress(40);
-
-      // Upload to BookFunnel
-      const bookFunnelService = await createBookFunnelService(integration);
-      const uploadResult = await bookFunnelService.uploadFile(
-        fileBuffer,
-        book.fileName
-      );
-
-      await (jobRecord as any).updateProgress(80);
-
-      // Update book with upload result
-      book.metadata = {
-        ...book.metadata,
-        bookFunnelUploadId: uploadResult.id,
-      } as any;
-      await book.save();
-
-      await (jobRecord as any).updateProgress(100);
-      await (jobRecord as any).markCompleted(uploadResult);
-
-      return uploadResult;
-    } catch (error) {
-      const jobRecord = await JobModel.findById(jobId);
-      if (jobRecord) {
-        await (jobRecord as any).markFailed({
-          message: error instanceof Error ? error.message : "Unknown error",
-          stack: error instanceof Error ? error.stack : undefined,
-        });
-      }
-      throw error;
-    }
-  }
-
-  /**
-   * ARC Campaign Create Processor
-   */
-  static async processArcCampaignCreate(job: Job): Promise<any> {
-    const { jobId, bookId, userId, campaignData } = job.data;
-
-    try {
-      const jobRecord = await JobModel.findById(jobId);
-      if (!jobRecord) {
-        throw new Error("Job record not found");
-      }
-
-      await (jobRecord as any).markProcessing();
-      await (jobRecord as any).updateProgress(10);
-
-      // Get book and integration
-      const book = await Book.findById(bookId);
-      if (!book) {
-        throw new Error("Book not found");
-      }
-
-      const integration = await (Integration as any).findActiveByProvider(
-        userId,
-        IntegrationProvider.BOOKFUNNEL
-      );
-      if (!integration) {
-        throw new Error("BookFunnel integration not found or inactive");
-      }
-
-      await (jobRecord as any).updateProgress(30);
-
-      // Create campaign in BookFunnel
-      const bookFunnelService = await createBookFunnelService(integration);
-      const campaign = await bookFunnelService.createCampaign({
-        name: campaignData.name,
-        description: campaignData.description,
-        max_downloads: campaignData.maxDownloads,
-        expires_at: campaignData.expiresAt,
-        upload_id: (book.metadata as any).bookFunnelUploadId,
-      });
-
-      await (jobRecord as any).updateProgress(70);
-
-      // Store campaign ID in book metadata
-      book.metadata = {
-        ...book.metadata,
-        bookFunnelCampaignId: campaign.id,
-      } as any;
-      await book.save();
-
-      await (jobRecord as any).updateProgress(100);
-      await (jobRecord as any).markCompleted(campaign);
-
-      return campaign;
-    } catch (error) {
-      const jobRecord = await JobModel.findById(jobId);
-      if (jobRecord) {
-        await (jobRecord as any).markFailed({
-          message: error instanceof Error ? error.message : "Unknown error",
-          stack: error instanceof Error ? error.stack : undefined,
-        });
-      }
-      throw error;
-    }
-  }
-
-  /**
-   * ARC Codes Generate Processor
-   */
-  static async processArcCodesGenerate(job: Job): Promise<any> {
-    const { jobId, bookId, userId, quantity, expiresAt, maxDownloadsPerCode } =
-      job.data;
-
-    try {
-      const jobRecord = await JobModel.findById(jobId);
-      if (!jobRecord) {
-        throw new Error("Job record not found");
-      }
-
-      await (jobRecord as any).markProcessing();
-      await (jobRecord as any).updateProgress(10);
-
-      // Get book and integration
-      const book = await Book.findById(bookId);
-      if (!book) {
-        throw new Error("Book not found");
-      }
-
-      const integration = await (Integration as any).findActiveByProvider(
-        userId,
-        IntegrationProvider.BOOKFUNNEL
-      );
-      if (!integration) {
-        throw new Error("BookFunnel integration not found or inactive");
-      }
-
-      await (jobRecord as any).updateProgress(20);
-
-      // Generate ARC codes in BookFunnel
-      const bookFunnelService = await createBookFunnelService(integration);
-      const arcCodes = await bookFunnelService.createArcCodes({
-        campaign_id: (book.metadata as any).bookFunnelCampaignId,
-        quantity,
-        expires_at: expiresAt,
-        max_downloads_per_code: maxDownloadsPerCode,
-      });
-
-      await (jobRecord as any).updateProgress(60);
-
-      // Create ARC link records
-      const arcLinks = [];
-      for (const arcCode of arcCodes) {
-        const code = await (ArcLink as any).generateUniqueCode();
-        const arcLink = new ArcLink({
-          bookId,
-          userId,
-          code,
-          url: arcCode.url,
-          campaignId: book.metadata.bookFunnelCampaignId,
-          expiresAt: arcCode.expires_at
-            ? new Date(arcCode.expires_at)
-            : undefined,
-          maxDownloads: arcCode.max_downloads,
-          downloadsCount: arcCode.downloads_count,
-          status: "active",
-          metadata: {
-            title: book.title,
-            author: book.author,
-            format: "EPUB",
-            description: book.description,
-          },
-        });
-
-        await arcLink.save();
-        arcLinks.push(arcLink);
-      }
-
-      await (jobRecord as any).updateProgress(100);
-      await (jobRecord as any).markCompleted({ arcLinks, arcCodes });
-
-      return { arcLinks, arcCodes };
-    } catch (error) {
-      const jobRecord = await JobModel.findById(jobId);
-      if (jobRecord) {
-        await (jobRecord as any).markFailed({
-          message: error instanceof Error ? error.message : "Unknown error",
-          stack: error instanceof Error ? error.stack : undefined,
-        });
-      }
-      throw error;
-    }
-  }
 }
 
 // Initialize workers
@@ -539,77 +316,58 @@ export const initializeWorkers = () => {
   redisConnection
     .info()
     .then((info) => {
-      const versionMatch = info.match(/redis_version:(\d+\.\d+\.\d+)/);
-      if (versionMatch) {
-        const version = versionMatch[1];
-        const [major] = version.split(".").map(Number);
-
-        if (major < 5) {
-          console.warn(
-            `⚠️  Redis version ${version} is not compatible with BullMQ (requires 5.0.0+). Job workers will be disabled.`
-          );
-          console.warn(
-            "Please upgrade Redis to version 5.0.0 or higher to enable job processing."
-          );
-          return;
-        }
-      }
-
-      // Initialize workers only if Redis is compatible
-      const workerConfig = {
-        connection: redisConnection,
-        concurrency: 5,
-      };
-
-      // Create workers for each job type
-      Object.values(JobType).forEach((jobType) => {
-        const queue = jobQueues.get(jobType);
-        if (!queue) return;
-
-        const worker = new Worker(
-          jobType,
-          async (job: Job) => {
-            console.log(`Processing job ${jobType}:`, job.id);
-
-            switch (jobType) {
-              case JobType.EPUB_VALIDATION:
-                return await JobProcessors.processEpubValidation(job);
-              case JobType.EPUB_PACKAGING:
-                return await JobProcessors.processEpubPackaging(job);
-              case JobType.BOOKFUNNEL_UPLOAD:
-                return await JobProcessors.processBookFunnelUpload(job);
-              case JobType.ARC_CAMPAIGN_CREATE:
-                return await JobProcessors.processArcCampaignCreate(job);
-              case JobType.ARC_CODES_GENERATE:
-                return await JobProcessors.processArcCodesGenerate(job);
-              default:
-                throw new Error(`Unknown job type: ${jobType}`);
-            }
-          },
-          workerConfig
-        );
-
-        worker.on("completed", (job) => {
-          console.log(`Job ${jobType} completed:`, job.id);
-        });
-
-        worker.on("failed", (job, err) => {
-          console.error(`Job ${jobType} failed:`, job?.id, err);
-        });
-
-        worker.on("error", (err) => {
-          console.error(`Worker ${jobType} error:`, err);
-        });
-      });
-
-      console.log("✅ Job workers initialized");
+      console.log("✅ Redis connection established");
+      console.log(`📊 Redis version: ${info.split("\n")[0]}`);
     })
     .catch((error) => {
-      console.warn(
-        "⚠️  Could not connect to Redis. Job workers will be disabled."
-      );
-      console.warn("Redis connection error:", error.message);
+      console.error("❌ Redis connection failed:", error);
+      throw error;
     });
-};
 
-// Note: Workers will be initialized by calling initializeWorkers() after dotenv.config()
+  // Worker configuration
+  const workerConfig = {
+    connection: redisConnection,
+    concurrency: 5,
+  };
+
+  // Create workers for each job type
+  Object.values(JobType).forEach((jobType) => {
+    const queue = jobQueues.get(jobType);
+    if (!queue) {
+      console.warn(`Queue not found for job type: ${jobType}`);
+      return;
+    }
+
+    const worker = new Worker(
+      jobType,
+      async (job: Job) => {
+        console.log(`Processing job ${jobType}:`, job.id);
+
+        switch (jobType) {
+          case JobType.EPUB_VALIDATION:
+            return await JobProcessors.processEpubValidation(job);
+          case JobType.EPUB_PACKAGING:
+            return await JobProcessors.processEpubPackaging(job);
+          default:
+            throw new Error(`Unknown job type: ${jobType}`);
+        }
+      },
+      workerConfig
+    );
+
+    // Worker event listeners
+    worker.on("completed", (job) => {
+      console.log(`✅ Job ${jobType} completed:`, job.id);
+    });
+
+    worker.on("failed", (job, err) => {
+      console.error(`❌ Job ${jobType} failed:`, job?.id, err.message);
+    });
+
+    worker.on("error", (err) => {
+      console.error(`❌ Worker ${jobType} error:`, err);
+    });
+  });
+
+  console.log("🔧 Job workers initialized");
+};
