@@ -1,16 +1,7 @@
 import { Request, Response, NextFunction } from "express";
-import crypto from "crypto";
 import { User } from "../models/User";
 import { StripeService } from "../services/stripeService";
 import { EmailService } from "../services/emailService";
-import { CustomError } from "../middleware/errorHandler";
-import { Book } from "../models/Book";
-import { ArcLink } from "../models/ArcLink";
-import { Job } from "../models/Job";
-import { Integration } from "../models/Integration";
-import { IntegrationProvider, BookStatus, ArcLinkStatus } from "../types";
-import { ApiResponse } from "../types";
-
 export class WebhookController {
   /**
    * Handle Stripe webhook events

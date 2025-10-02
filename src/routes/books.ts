@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { BookController, upload } from "../controllers/bookController";
+import { BookController } from "../controllers/bookController";
 import { auth } from "../middleware/auth";
 import {
   uploadBookValidation,
@@ -7,7 +7,6 @@ import {
   getBookValidation,
   deleteBookValidation,
   getBooksValidation,
-  getBookStatusValidation,
   getBookDownloadUrlValidation,
 } from "../validation/bookValidation";
 
@@ -19,13 +18,13 @@ router.use(auth);
 // Book upload (with file upload)
 router.post(
   "/upload",
-  upload.single("epubFile"),
+  BookController.upload.single("epubFile"),
   uploadBookValidation,
   BookController.uploadBook
 );
 
 // Get user's books
-router.get("/", getBooksValidation, BookController.getUserBooks);
+router.get("/", getBooksValidation, BookController.getBooks);
 
 // Get book by ID
 router.get("/:id", getBookValidation, BookController.getBook);
@@ -41,13 +40,6 @@ router.get(
   "/:id/download",
   getBookDownloadUrlValidation,
   BookController.getBookDownloadUrl
-);
-
-// Get book processing status
-router.get(
-  "/:id/status",
-  getBookStatusValidation,
-  BookController.getBookStatus
 );
 
 export default router;

@@ -3,7 +3,6 @@ import { validationResult } from "express-validator";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import crypto from "crypto";
 import {
   IBook,
   BookStatus,
@@ -12,8 +11,6 @@ import {
   AuthRequest,
 } from "../types";
 import { Book } from "../models/Book";
-import { JobService } from "../services/jobService";
-import { JobType } from "../types";
 import { EpubService } from "../services/epubService";
 import { getStorageService } from "../services/storageService";
 
@@ -51,16 +48,16 @@ const upload = multer({
 
 export class BookController {
   /**
-   * Upload EPUB file and create book record
+   * Upload and create a new book
    */
   static async uploadBook(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
+      const validationErrors = validationResult(req);
+      if (!validationErrors.isEmpty()) {
         res.status(400).json({
           success: false,
           message: "Validation failed",
-          error: errors.array()[0].msg,
+          error: validationErrors.array()[0].msg,
         } as ApiResponse);
         return;
       }
@@ -74,79 +71,81 @@ export class BookController {
       }
 
       const userId = req.user!._id;
-      const {
-        title,
-        author,
-        description,
-        isbn,
-        publisher,
-        language,
-        genre,
-        tags,
-      } = req.body;
+      const { title, author, description, isbn, language, category } = req.body;
 
-      // Generate file key for S3
-      const fileKey = EpubService.generateFileKey(
-        userId,
-        req.file.originalname
+      // Validate EPUB file synchronously
+      console.log("Validating EPUB file...");
+      const epubValidationResult = await EpubService.validateEpub(
+        req.file.path
       );
 
-      // Calculate SHA-256 checksum of the uploaded file
+      if (!epubValidationResult.isValid) {
+        // Clean up temp file
+        await EpubService.cleanupTempFile(req.file.path);
+
+        res.status(400).json({
+          success: false,
+          message: "Invalid EPUB file",
+          error: epubValidationResult.errors.join(", "),
+        } as ApiResponse);
+        return;
+      }
+
+      console.log("EPUB validation successful, processing...");
+
+      // Process EPUB for additional metadata
+      const processingResult = await EpubService.processEpub(
+        req.file.path,
+        epubValidationResult.metadata as any
+      );
+
+      // Upload to storage service
       const fileBuffer = fs.readFileSync(req.file.path);
-      const checksum = crypto
-        .createHash("sha256")
-        .update(fileBuffer)
-        .digest("hex");
-
-      // Create book record
-      const book = new Book({
-        userId,
-        title,
-        author,
-        description,
-        isbn,
-        publisher,
-        language: language || "en",
-        genre: genre ? genre.split(",").map((g: string) => g.trim()) : [],
-        tags: tags ? tags.split(",").map((t: string) => t.trim()) : [],
-        fileKey,
-        fileName: req.file.originalname,
-        fileSize: req.file.size,
-        checksum,
-        metadata: {
-          title,
-          creator: author,
-          language: language || "en",
-        },
-        status: BookStatus.UPLOADING,
-      });
-
-      await book.save();
-
-      // Upload file to storage
       const storageService = getStorageService();
-      await storageService.uploadFile(
-        fileKey,
+      const uploadResult = await storageService.uploadFile(
+        `books/${userId}/${Date.now()}-${req.file.originalname}`,
         fileBuffer,
         EpubService.getEpubMimeType(),
         {
           userId: userId.toString(),
-          bookId: book._id.toString(),
           originalName: req.file.originalname,
         }
       );
+      const fileKey = uploadResult.key;
 
-      // Start validation job (cleanup will be handled in the job processor)
-      await JobService.addJob(JobType.EPUB_VALIDATION, {
-        jobId: book._id,
-        bookId: book._id,
+      // Create book record
+      const book = new Book({
+        title,
+        author,
+        description,
+        isbn,
+        language: language || "en",
+        category: category || "general",
         userId,
-        filePath: req.file.path,
+        fileName: req.file.originalname,
+        fileKey,
+        fileUrl: fileKey, // Use fileKey as fileUrl for now
+        fileSize: epubValidationResult.fileSize,
+        checksum: epubValidationResult.checksum,
+        status: BookStatus.READY,
+        metadata: {
+          ...epubValidationResult.metadata!,
+          creator: epubValidationResult.metadata!.creator,
+        },
+        pageCount: processingResult.pageCount,
+        wordCount: processingResult.wordCount,
+        readingTime: processingResult.readingTime,
+        coverImageUrl: processingResult.coverImageUrl,
       });
+
+      await book.save();
+
+      // Clean up temp file
+      await EpubService.cleanupTempFile(req.file.path);
 
       res.status(201).json({
         success: true,
-        message: "Book uploaded successfully",
+        message: "Book uploaded and validated successfully",
         data: book as any,
       } as ApiResponse<IBook>);
     } catch (error) {
@@ -157,7 +156,7 @@ export class BookController {
         try {
           await EpubService.cleanupTempFile(req.file.path);
         } catch (cleanupError) {
-          console.warn("Failed to cleanup temp file:", cleanupError);
+          console.error("Failed to cleanup temp file:", cleanupError);
         }
       }
 
@@ -170,23 +169,22 @@ export class BookController {
   }
 
   /**
-   * Get user's books
+   * Get all books for a user
    */
-  static async getUserBooks(req: AuthRequest, res: Response): Promise<void> {
+  static async getBooks(req: AuthRequest, res: Response): Promise<void> {
     try {
       const userId = req.user!._id;
       const {
         page = 1,
         limit = 10,
         search,
+        category,
         status,
-        genre,
-        language,
-        author,
-        sort = "uploadDate",
-        order = "desc",
-      } = req.query as BookQuery;
+        sortBy = "createdAt",
+        sortOrder = "desc",
+      } = req.query;
 
+      const skip = (Number(page) - 1) * Number(limit);
       const query: any = { userId };
 
       // Apply filters
@@ -198,47 +196,40 @@ export class BookController {
         ];
       }
 
+      if (category) {
+        query.category = category as string;
+      }
+
       if (status) {
-        query.status = status;
+        query.status = status as BookStatus;
       }
 
-      if (genre) {
-        query.genre = { $in: [genre] };
-      }
+      // Build sort object
+      const sort: any = {};
+      sort[sortBy as string] = sortOrder === "desc" ? -1 : 1;
 
-      if (language) {
-        query.language = language;
-      }
+      const books = await Book.find(query)
+        .sort(sort)
+        .skip(skip)
+        .limit(Number(limit));
 
-      if (author) {
-        query.author = { $regex: author, $options: "i" };
-      }
-
-      // Calculate pagination
-      const skip = (Number(page) - 1) * Number(limit);
-      const sortOrder = order === "desc" ? -1 : 1;
-
-      const [books, total] = await Promise.all([
-        Book.find(query)
-          .sort({ [sort]: sortOrder })
-          .skip(skip)
-          .limit(Number(limit)),
-        Book.countDocuments(query),
-      ]);
+      const total = await Book.countDocuments(query);
 
       res.json({
         success: true,
         message: "Books retrieved successfully",
-        data: books as any,
-        pagination: {
-          page: Number(page),
-          limit: Number(limit),
-          total,
-          pages: Math.ceil(total / Number(limit)),
+        data: {
+          books,
+          pagination: {
+            page: Number(page),
+            limit: Number(limit),
+            total,
+            pages: Math.ceil(total / Number(limit)),
+          },
         },
-      } as ApiResponse<IBook[]>);
+      } as ApiResponse);
     } catch (error) {
-      console.error("Get user books error:", error);
+      console.error("Get books error:", error);
       res.status(500).json({
         success: false,
         message: "Failed to retrieve books",
@@ -248,14 +239,15 @@ export class BookController {
   }
 
   /**
-   * Get book by ID
+   * Get a single book by ID
    */
   static async getBook(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
       const userId = req.user!._id;
+      const { id } = req.params;
 
       const book = await Book.findOne({ _id: id, userId });
+
       if (!book) {
         res.status(404).json({
           success: false,
@@ -280,7 +272,7 @@ export class BookController {
   }
 
   /**
-   * Update book metadata
+   * Update a book
    */
   static async updateBook(req: AuthRequest, res: Response): Promise<void> {
     try {
@@ -294,11 +286,16 @@ export class BookController {
         return;
       }
 
-      const { id } = req.params;
       const userId = req.user!._id;
-      const updates = req.body;
+      const { id } = req.params;
+      const updateData = req.body;
 
-      const book = await Book.findOne({ _id: id, userId });
+      const book = await Book.findOneAndUpdate(
+        { _id: id, userId },
+        updateData,
+        { new: true, runValidators: true }
+      );
+
       if (!book) {
         res.status(404).json({
           success: false,
@@ -306,34 +303,6 @@ export class BookController {
         } as ApiResponse);
         return;
       }
-
-      // Update allowed fields
-      const allowedUpdates = [
-        "title",
-        "author",
-        "description",
-        "isbn",
-        "publisher",
-        "publicationDate",
-        "language",
-        "genre",
-        "tags",
-      ];
-
-      allowedUpdates.forEach((field) => {
-        if (updates[field] !== undefined) {
-          (book as any)[field] = updates[field];
-        }
-      });
-
-      // Update metadata
-      if (updates.title) book.metadata.title = updates.title;
-      if (updates.author) book.metadata.creator = updates.author;
-      if (updates.description) book.metadata.description = updates.description;
-      if (updates.publisher) book.metadata.publisher = updates.publisher;
-      if (updates.language) book.metadata.language = updates.language;
-
-      await book.save();
 
       res.json({
         success: true,
@@ -351,14 +320,15 @@ export class BookController {
   }
 
   /**
-   * Delete book
+   * Delete a book
    */
   static async deleteBook(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
       const userId = req.user!._id;
+      const { id } = req.params;
 
       const book = await Book.findOne({ _id: id, userId });
+
       if (!book) {
         res.status(404).json({
           success: false,
@@ -368,12 +338,15 @@ export class BookController {
       }
 
       // Delete file from storage
-      const storageService = getStorageService();
-      await storageService.deleteFile(book.fileKey);
+      try {
+        const storageService = getStorageService();
+        await storageService.deleteFile(book.fileKey);
+      } catch (storageError) {
+        console.error("Failed to delete file from storage:", storageError);
+        // Continue with book deletion even if storage deletion fails
+      }
 
-      // Mark book as deleted
-      book.status = BookStatus.DELETED;
-      await book.save();
+      await Book.findByIdAndDelete(id);
 
       res.json({
         success: true,
@@ -397,10 +370,11 @@ export class BookController {
     res: Response
   ): Promise<void> {
     try {
-      const { id } = req.params;
       const userId = req.user!._id;
+      const { id } = req.params;
 
       const book = await Book.findOne({ _id: id, userId });
+
       if (!book) {
         res.status(404).json({
           success: false,
@@ -419,21 +393,19 @@ export class BookController {
 
       const storageService = getStorageService();
       const downloadUrl = await storageService.generatePresignedDownloadUrl(
-        book.fileKey,
-        3600
-      ); // 1 hour
+        book.fileKey
+      );
 
       res.json({
         success: true,
         message: "Download URL generated successfully",
         data: {
           downloadUrl,
-          expiresIn: 3600,
-          fileName: book.fileName,
+          expiresIn: 3600, // 1 hour
         },
       } as ApiResponse);
     } catch (error) {
-      console.error("Get download URL error:", error);
+      console.error("Get book download URL error:", error);
       res.status(500).json({
         success: false,
         message: "Failed to generate download URL",
@@ -442,44 +414,6 @@ export class BookController {
     }
   }
 
-  /**
-   * Get book processing status
-   */
-  static async getBookStatus(req: AuthRequest, res: Response): Promise<void> {
-    try {
-      const { id } = req.params;
-      const userId = req.user!._id;
-
-      const book = await Book.findOne({ _id: id, userId });
-      if (!book) {
-        res.status(404).json({
-          success: false,
-          message: "Book not found",
-        } as ApiResponse);
-        return;
-      }
-
-      // Get related jobs
-      const jobs = await JobService.getBookJobs(id);
-
-      res.json({
-        success: true,
-        message: "Book status retrieved successfully",
-        data: {
-          book,
-          jobs,
-        },
-      } as ApiResponse);
-    } catch (error) {
-      console.error("Get book status error:", error);
-      res.status(500).json({
-        success: false,
-        message: "Failed to retrieve book status",
-        error: error instanceof Error ? error.message : "Unknown error",
-      } as ApiResponse);
-    }
-  }
+  // Export multer middleware for use in routes
+  static upload = upload;
 }
-
-// Export multer middleware
-export { upload };

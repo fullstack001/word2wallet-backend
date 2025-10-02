@@ -14,7 +14,7 @@ import { notFound } from "./middleware/notFound";
 import { createAdminUserFromEnv } from "./utils/createAdminUser";
 import WebSocketManager from "./services/websocketServer";
 import { AuctionScheduler } from "./services/auctionScheduler";
-import { initializeWorkers, initializeQueues } from "./services/jobService";
+// Job service removed - no longer needed for simple book operations
 
 // Import routes
 import authRoutes from "./routes/auth";
@@ -27,7 +27,7 @@ import webhookRoutes from "./routes/webhooks";
 import dashboardRoutes from "./routes/dashboard";
 import translationRoutes from "./routes/translation";
 import auctionRoutes from "./routes/auctions";
-import demoRoutes from "./routes/demo";
+// Demo routes removed
 import bookRoutes from "./routes/books";
 import fileRoutes from "./routes/files";
 import { setWebSocketManager } from "./controllers/auctionController";
@@ -35,9 +35,7 @@ import { setWebSocketManager } from "./controllers/auctionController";
 // Load environment variables
 dotenv.config();
 
-// Initialize Redis-dependent services after environment variables are loaded
-initializeQueues();
-initializeWorkers();
+// Redis/Job services removed - no longer needed for simple operations
 
 const app = express();
 const server = createServer(app);
@@ -159,7 +157,7 @@ app.use("/api/webhooks", webhookRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/translation", translationRoutes);
 app.use("/api/auctions", auctionRoutes);
-app.use("/api/demo", demoRoutes);
+// Demo routes removed
 app.use("/api/books", bookRoutes);
 app.use("/files", fileRoutes);
 
@@ -181,9 +179,7 @@ const startServer = async () => {
     console.log("⏰ Starting auction scheduler...");
     AuctionScheduler.start();
 
-    // Initialize job workers
-    console.log("🔧 Initializing job workers...");
-    initializeWorkers();
+    // Job workers removed - no longer needed
 
     server.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);

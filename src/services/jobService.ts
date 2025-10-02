@@ -1,19 +1,8 @@
 import { Queue, Worker, Job, QueueEvents } from "bullmq";
 import IORedis from "ioredis";
-import {
-  IJob,
-  JobType,
-  JobStatus,
-  IBook,
-  IArcLink,
-  IIntegration,
-  IntegrationProvider,
-  BookStatus,
-} from "../types";
+import { IJob, JobType, JobStatus, IBook, BookStatus } from "../types";
 import { Job as JobModel } from "../models/Job";
 import { Book } from "../models/Book";
-import { ArcLink } from "../models/ArcLink";
-import { Integration } from "../models/Integration";
 import { EpubService } from "./epubService";
 import { getS3Service } from "./s3Service";
 
