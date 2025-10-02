@@ -179,7 +179,7 @@ export const uploadEpub = multer({
   storage: epubStorage,
   fileFilter: epubFileFilter,
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB limit
+    fileSize: 100 * 1024 * 1024, // 100MB limit
     files: 1, // Only one file at a time
   },
 });
@@ -188,7 +188,7 @@ export const uploadThumbnail = multer({
   storage: thumbnailStorage,
   fileFilter: imageFileFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
+    fileSize: 100 * 1024 * 1024, // 100MB limit
     files: 1, // Only one file at a time
   },
 });
@@ -206,7 +206,7 @@ export const uploadVideo = multer({
   storage: videoStorage,
   fileFilter: videoFileFilter,
   limits: {
-    fileSize: 500 * 1024 * 1024, // 500MB limit
+    fileSize: 100 * 1024 * 1024, // 100MB limit
     files: 10, // Maximum 10 video files
   },
 });
@@ -273,7 +273,7 @@ export const uploadCourseContent = multer({
     }
   },
   limits: {
-    fileSize: 500 * 1024 * 1024, // 500MB limit for videos
+    fileSize: 100 * 1024 * 1024, // 100MB limit for all files
     files: 20, // Maximum 20 files total
   },
 });
@@ -315,7 +315,7 @@ export const uploadMultiple = multer({
     }
   },
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB limit
+    fileSize: 100 * 1024 * 1024, // 100MB limit
     files: 2, // Maximum 2 files
   },
 });
