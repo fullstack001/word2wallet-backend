@@ -30,6 +30,14 @@ import auctionRoutes from "./routes/auctions";
 // Demo routes removed
 import bookRoutes from "./routes/books";
 import fileRoutes from "./routes/files";
+// New book delivery routes
+import deliveryLinkRoutes from "./routes/deliveryLinkRoutes";
+import landingPageRoutes from "./routes/landingPageRoutes";
+import analyticsRoutes from "./routes/analyticsRoutes";
+import emailCaptureRoutes from "./routes/emailCaptureRoutes";
+// Email marketing and payment gateway routes
+import emailMarketingRoutes from "./routes/emailMarketingRoutes";
+import paymentGatewayRoutes from "./routes/paymentGatewayRoutes";
 import { setWebSocketManager } from "./controllers/auctionController";
 
 // Load environment variables
@@ -160,6 +168,14 @@ app.use("/api/auctions", auctionRoutes);
 // Demo routes removed
 app.use("/api/books", bookRoutes);
 app.use("/files", fileRoutes);
+// New book delivery routes
+app.use("/api/delivery-links", deliveryLinkRoutes);
+app.use("/api/landing-pages", landingPageRoutes);
+app.use("/api/analytics", analyticsRoutes);
+app.use("/api/email-captures", emailCaptureRoutes);
+// Email marketing and payment gateway routes
+app.use("/api/email-marketing", emailMarketingRoutes);
+app.use("/api/payment-gateway", paymentGatewayRoutes);
 
 // Error handling middleware
 app.use(notFound);

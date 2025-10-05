@@ -12,10 +12,53 @@ export interface IBook {
   language: string;
   genre?: string[];
   tags?: string[];
-  fileKey: string; // S3 key for the EPUB file
-  fileName: string;
-  fileSize: number;
-  checksum: string; // SHA-256 hash
+
+  // New book information fields
+  label?: string; // Book label or subtitle
+  series?: string; // Book series name
+  volume?: string; // Volume number in series
+  tagline?: string; // Book tagline or catchphrase
+  notesToReaders?: string; // Special notes to readers
+  bookType?: BookType; // Type of book (advance_copy, excerpt, etc.)
+  ebookType?: "doc" | "audio"; // Ebook type: document/book or audio book
+  narrator?: string; // Audio narrator name
+  audioQuality?: string; // Audio quality for distribution
+
+  // Cover image fields (only 1 allowed)
+  coverImageKey?: string; // S3 key for cover image
+  coverImageName?: string; // Original cover image filename
+  coverImageSize?: number; // Cover image file size
+
+  // File fields (only 1 epub and 1 PDF allowed for regular books, 1 audio file for audio books)
+  epubFile?: {
+    fileKey?: string;
+    fileName?: string;
+    fileSize?: number;
+    checksum?: string;
+    uploadedAt?: Date;
+  };
+  pdfFile?: {
+    fileKey?: string;
+    fileName?: string;
+    fileSize?: number;
+    checksum?: string;
+    uploadedAt?: Date;
+  };
+  audioFile?: {
+    fileKey?: string;
+    fileName?: string;
+    fileSize?: number;
+    checksum?: string;
+    uploadedAt?: Date;
+  };
+
+  // Legacy fields for backward compatibility
+  fileKey?: string; // S3 key for the book file
+  fileName?: string;
+  fileSize?: number;
+  fileType?: BookFileType; // EPUB, PDF, or AUDIO
+  checksum?: string; // SHA-256 hash
+
   metadata: {
     title: string;
     creator: string;
@@ -32,16 +75,8 @@ export interface IBook {
     coverage?: string;
     contributor?: string;
     type?: string;
-    // BookFunnel specific fields
-    bookFunnelUploadId?: string;
-    bookFunnelUploadStatus?: string;
-    bookFunnelDownloadUrl?: string;
-    bookFunnelErrorMessage?: string;
-    bookFunnelCampaignId?: string;
-    bookFunnelCampaignStatus?: string;
-    bookFunnelCampaignName?: string;
-    bookFunnelDownloadCount?: number;
   };
+
   status: BookStatus;
   uploadDate: Date;
   lastModified: Date;
@@ -49,14 +84,43 @@ export interface IBook {
   pageCount?: number;
   wordCount?: number;
   readingTime?: number; // in minutes
+
+  // Delivery features
+  isPublic: boolean; // Whether book can be accessed via public links
+  allowEmailCapture: boolean; // Whether to capture reader emails
+  deliverySettings: {
+    requireEmail: boolean; // Require email before download
+    allowAnonymous: boolean; // Allow anonymous downloads
+    maxDownloads?: number; // Max downloads per link
+    expiryDate?: Date; // When the book becomes unavailable
+  };
 }
 
 export enum BookStatus {
+  DRAFT = "draft",
   UPLOADING = "uploading",
   PROCESSING = "processing",
   READY = "ready",
   ERROR = "error",
   DELETED = "deleted",
+}
+
+export enum BookFileType {
+  EPUB = "epub",
+  PDF = "pdf",
+  AUDIO = "audio",
+}
+
+export enum BookType {
+  ADVANCE_COPY = "advance_copy",
+  EXCERPT = "excerpt",
+  FULL_BOOK = "full_book",
+  NOVELLA = "novella",
+  PREVIEW = "preview",
+  SAMPLE = "sample",
+  SHORT_STORY = "short_story",
+  TEASER = "teaser",
+  OTHER = "other",
 }
 
 const bookSchema = new Schema<IBook>(
@@ -119,22 +183,127 @@ const bookSchema = new Schema<IBook>(
         maxlength: [30, "Tag cannot exceed 30 characters"],
       },
     ],
+
+    // New book information fields
+    label: {
+      type: String,
+      trim: true,
+      maxlength: [200, "Label cannot exceed 200 characters"],
+    },
+    series: {
+      type: String,
+      trim: true,
+      maxlength: [100, "Series name cannot exceed 100 characters"],
+    },
+    volume: {
+      type: String,
+      trim: true,
+      maxlength: [50, "Volume cannot exceed 50 characters"],
+    },
+    tagline: {
+      type: String,
+      trim: true,
+      maxlength: [300, "Tagline cannot exceed 300 characters"],
+    },
+    notesToReaders: {
+      type: String,
+      trim: true,
+      maxlength: [2000, "Notes to readers cannot exceed 2000 characters"],
+    },
+    bookType: {
+      type: String,
+      enum: Object.values(BookType),
+      default: BookType.FULL_BOOK,
+    },
+    ebookType: {
+      type: String,
+      enum: ["doc", "audio"],
+      default: "doc",
+    },
+    narrator: {
+      type: String,
+      trim: true,
+      maxlength: [100, "Narrator name cannot exceed 100 characters"],
+    },
+    audioQuality: {
+      type: String,
+      trim: true,
+      maxlength: [50, "Audio quality cannot exceed 50 characters"],
+    },
+    coverImageKey: {
+      type: String,
+      trim: true,
+    },
+    coverImageName: {
+      type: String,
+      trim: true,
+    },
+    coverImageSize: {
+      type: Number,
+      min: [0, "Cover image size must be 0 or greater"],
+    },
+    epubFile: {
+      fileKey: { type: String, required: false },
+      fileName: { type: String, required: false },
+      fileSize: {
+        type: Number,
+        required: false,
+        min: [0, "File size must be 0 or greater"],
+      },
+      checksum: {
+        type: String,
+        required: false,
+        match: [/^[a-f0-9]{64}$/, "Checksum must be a valid SHA-256 hash"],
+      },
+      uploadedAt: { type: Date, default: Date.now },
+    },
+    pdfFile: {
+      fileKey: { type: String, required: false },
+      fileName: { type: String, required: false },
+      fileSize: {
+        type: Number,
+        required: false,
+        min: [0, "File size must be 0 or greater"],
+      },
+      checksum: {
+        type: String,
+        required: false,
+        match: [/^[a-f0-9]{64}$/, "Checksum must be a valid SHA-256 hash"],
+      },
+      uploadedAt: { type: Date, default: Date.now },
+    },
+    audioFile: {
+      fileKey: { type: String, required: false },
+      fileName: { type: String, required: false },
+      fileSize: {
+        type: Number,
+        required: false,
+        min: [0, "File size must be 0 or greater"],
+      },
+      checksum: {
+        type: String,
+        required: false,
+        match: [/^[a-f0-9]{64}$/, "Checksum must be a valid SHA-256 hash"],
+      },
+      uploadedAt: { type: Date, default: Date.now },
+    },
+    // Legacy fields for backward compatibility
     fileKey: {
       type: String,
-      required: [true, "File key is required"],
     },
     fileName: {
       type: String,
-      required: [true, "File name is required"],
     },
     fileSize: {
       type: Number,
-      required: [true, "File size is required"],
-      min: [1, "File size must be greater than 0"],
+      min: [0, "File size must be 0 or greater"],
+    },
+    fileType: {
+      type: String,
+      enum: Object.values(BookFileType),
     },
     checksum: {
       type: String,
-      required: [true, "Checksum is required"],
       match: [/^[a-f0-9]{64}$/, "Checksum must be a valid SHA-256 hash"],
     },
     metadata: {
@@ -153,15 +322,6 @@ const bookSchema = new Schema<IBook>(
       coverage: { type: String },
       contributor: { type: String },
       type: { type: String },
-      // BookFunnel specific fields
-      bookFunnelUploadId: { type: String },
-      bookFunnelUploadStatus: { type: String },
-      bookFunnelDownloadUrl: { type: String },
-      bookFunnelErrorMessage: { type: String },
-      bookFunnelCampaignId: { type: String },
-      bookFunnelCampaignStatus: { type: String },
-      bookFunnelCampaignName: { type: String },
-      bookFunnelDownloadCount: { type: Number },
     },
     status: {
       type: String,
@@ -191,6 +351,32 @@ const bookSchema = new Schema<IBook>(
       type: Number,
       min: [0, "Reading time cannot be negative"],
     },
+    // Delivery features
+    isPublic: {
+      type: Boolean,
+      default: false,
+    },
+    allowEmailCapture: {
+      type: Boolean,
+      default: true,
+    },
+    deliverySettings: {
+      requireEmail: {
+        type: Boolean,
+        default: false,
+      },
+      allowAnonymous: {
+        type: Boolean,
+        default: true,
+      },
+      maxDownloads: {
+        type: Number,
+        min: [1, "Max downloads must be at least 1"],
+      },
+      expiryDate: {
+        type: Date,
+      },
+    },
   },
   {
     timestamps: true,
@@ -207,9 +393,14 @@ bookSchema.index({ uploadDate: -1 });
 bookSchema.index({ genre: 1 });
 bookSchema.index({ tags: 1 });
 
-// Virtual for file URL
+// Virtual for file URL (prioritizes epub, then PDF, then audio, then legacy fileKey)
 bookSchema.virtual("fileUrl").get(function () {
-  return `${process.env.S3_BASE_URL || ""}/${this.fileKey}`;
+  const fileKey =
+    this.epubFile?.fileKey ||
+    this.pdfFile?.fileKey ||
+    this.audioFile?.fileKey ||
+    this.fileKey;
+  return fileKey ? `${process.env.S3_BASE_URL || ""}/${fileKey}` : undefined;
 });
 
 // Update lastModified before saving

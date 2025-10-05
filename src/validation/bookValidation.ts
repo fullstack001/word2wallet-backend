@@ -48,6 +48,64 @@ export const uploadBookValidation = [
   body("genre").optional().isString().withMessage("Genre must be a string"),
 
   body("tags").optional().isString().withMessage("Tags must be a string"),
+
+  // New book information fields
+  body("label")
+    .optional()
+    .isLength({ max: 200 })
+    .withMessage("Label cannot exceed 200 characters")
+    .trim(),
+
+  body("series")
+    .optional()
+    .isLength({ max: 100 })
+    .withMessage("Series name cannot exceed 100 characters")
+    .trim(),
+
+  body("volume")
+    .optional()
+    .isLength({ max: 50 })
+    .withMessage("Volume cannot exceed 50 characters")
+    .trim(),
+
+  body("tagline")
+    .optional()
+    .isLength({ max: 300 })
+    .withMessage("Tagline cannot exceed 300 characters")
+    .trim(),
+
+  body("notesToReaders")
+    .optional()
+    .isLength({ max: 2000 })
+    .withMessage("Notes to readers cannot exceed 2000 characters")
+    .trim(),
+
+  body("bookType")
+    .optional()
+    .isIn([
+      "advance_copy",
+      "excerpt",
+      "full_book",
+      "novella",
+      "preview",
+      "sample",
+      "short_story",
+      "teaser",
+      "other",
+    ])
+    .withMessage("Invalid book type"),
+
+  body("narrator")
+    .optional()
+    .isLength({ max: 100 })
+    .withMessage("Narrator name cannot exceed 100 characters")
+    .trim(),
+
+  body("audioQuality")
+    .optional()
+    .isLength({ max: 50 })
+    .withMessage("Audio quality cannot exceed 50 characters")
+    .trim(),
 ];
 
 export const updateBookValidation = [
@@ -109,6 +167,64 @@ export const updateBookValidation = [
     .optional()
     .isLength({ max: 30 })
     .withMessage("Each tag cannot exceed 30 characters")
+    .trim(),
+
+  // New book information fields
+  body("label")
+    .optional()
+    .isLength({ max: 200 })
+    .withMessage("Label cannot exceed 200 characters")
+    .trim(),
+
+  body("series")
+    .optional()
+    .isLength({ max: 100 })
+    .withMessage("Series name cannot exceed 100 characters")
+    .trim(),
+
+  body("volume")
+    .optional()
+    .isLength({ max: 50 })
+    .withMessage("Volume cannot exceed 50 characters")
+    .trim(),
+
+  body("tagline")
+    .optional()
+    .isLength({ max: 300 })
+    .withMessage("Tagline cannot exceed 300 characters")
+    .trim(),
+
+  body("notesToReaders")
+    .optional()
+    .isLength({ max: 2000 })
+    .withMessage("Notes to readers cannot exceed 2000 characters")
+    .trim(),
+
+  body("bookType")
+    .optional()
+    .isIn([
+      "advance_copy",
+      "excerpt",
+      "full_book",
+      "novella",
+      "preview",
+      "sample",
+      "short_story",
+      "teaser",
+      "other",
+    ])
+    .withMessage("Invalid book type"),
+
+  body("narrator")
+    .optional()
+    .isLength({ max: 100 })
+    .withMessage("Narrator name cannot exceed 100 characters")
+    .trim(),
+
+  body("audioQuality")
+    .optional()
+    .isLength({ max: 50 })
+    .withMessage("Audio quality cannot exceed 50 characters")
     .trim(),
 ];
 

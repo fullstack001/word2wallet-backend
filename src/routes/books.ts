@@ -12,22 +12,17 @@ import {
 
 const router = Router();
 
-// All routes require authentication
+// Get book cover image (public access - no authentication required)
+router.get("/:id/cover", BookController.getBookCover);
+
+// All other routes require authentication
 router.use(auth);
 
-// Book upload (with file upload)
-router.post(
-  "/upload",
-  BookController.upload.single("epubFile"),
-  uploadBookValidation,
-  BookController.uploadBook
-);
-
-// Get user's books
+// Get all books for authenticated user
 router.get("/", getBooksValidation, BookController.getBooks);
 
-// Get book by ID
-router.get("/:id", getBookValidation, BookController.getBook);
+// Get single book by ID
+router.get("/:id", getBookValidation, BookController.getBookById);
 
 // Update book metadata
 router.put("/:id", updateBookValidation, BookController.updateBook);
@@ -40,6 +35,41 @@ router.get(
   "/:id/download",
   getBookDownloadUrlValidation,
   BookController.getBookDownloadUrl
+);
+
+// Create book draft (without file upload)
+router.post("/draft", uploadBookValidation, BookController.createDraft);
+
+// Upload cover image for draft book
+router.post(
+  "/:bookId/upload-cover",
+  BookController.uploadCover.single("coverImage"),
+  BookController.uploadCoverImage
+);
+
+// Update draft book with file upload
+router.post(
+  "/:bookId/upload",
+  BookController.upload.single("epubFile"),
+  BookController.updateDraftWithFile
+);
+
+// Upload audio file for a book
+router.post(
+  "/:bookId/upload-audio",
+  BookController.upload.single("audioFile"),
+  BookController.uploadAudioFile
+);
+
+// Complete book upload (change status from DRAFT to READY)
+router.post("/:bookId/complete", BookController.completeBookUpload);
+
+// Book upload (with file upload) - legacy endpoint
+router.post(
+  "/upload",
+  BookController.upload.single("epubFile"),
+  uploadBookValidation,
+  BookController.uploadBook
 );
 
 export default router;

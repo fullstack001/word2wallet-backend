@@ -91,6 +91,7 @@ export interface ICourse extends Document {
   _id: string;
   title: string;
   slug?: string;
+  url?: string; // Virtual field for full URL
   description?: string;
   subject: mongoose.Types.ObjectId; // Subject ID
   epubFile?: string; // File path
@@ -262,6 +263,9 @@ export interface IAuction extends Document {
   endTime: Date;
   extendSeconds: number; // Anti-sniping extension
   minIncrement: number;
+  timeRemaining?: number; // Virtual field for time remaining
+  reserveMet?: boolean; // Virtual field for reserve met status
+  onlineCount?: number; // Virtual field for online count
   images?: string[]; // Array of image URLs
   bids: mongoose.Types.ObjectId[];
   offers: mongoose.Types.ObjectId[];
@@ -291,6 +295,7 @@ export interface IOffer extends Document {
   status: OfferStatus;
   expiresAt: Date;
   counterOffer?: mongoose.Types.ObjectId;
+  isExpired?: boolean; // Virtual field for expired status
   createdAt: Date;
   updatedAt: Date;
 }
@@ -353,10 +358,52 @@ export interface IBook extends Document {
   language: string;
   genre?: string[];
   tags?: string[];
-  fileKey: string;
-  fileName: string;
-  fileSize: number;
-  checksum: string;
+
+  // New book information fields
+  label?: string; // Book label or subtitle
+  series?: string; // Book series name
+  volume?: string; // Volume number in series
+  tagline?: string; // Book tagline or catchphrase
+  notesToReaders?: string; // Special notes to readers
+  bookType?: BookType; // Type of book (advance_copy, excerpt, etc.)
+  ebookType?: "doc" | "audio"; // Ebook type: document/book or audio book
+  narrator?: string; // Audio narrator name
+  audioQuality?: string; // Audio quality for distribution
+
+  // Cover image fields (only 1 allowed)
+  coverImageKey?: string; // S3 key for cover image
+  coverImageName?: string; // Original cover image filename
+  coverImageSize?: number; // Cover image file size
+
+  // File fields (only 1 epub and 1 PDF allowed for regular books, 1 audio file for audio books)
+  epubFile?: {
+    fileKey?: string;
+    fileName?: string;
+    fileSize?: number;
+    checksum?: string;
+    uploadedAt?: Date;
+  };
+  pdfFile?: {
+    fileKey?: string;
+    fileName?: string;
+    fileSize?: number;
+    checksum?: string;
+    uploadedAt?: Date;
+  };
+  audioFile?: {
+    fileKey?: string;
+    fileName?: string;
+    fileSize?: number;
+    checksum?: string;
+    uploadedAt?: Date;
+  };
+
+  // Legacy fields for backward compatibility
+  fileKey?: string;
+  fileName?: string;
+  fileSize?: number;
+  fileType?: BookFileType;
+  checksum?: string;
   metadata: {
     title: string;
     creator: string;
@@ -373,15 +420,6 @@ export interface IBook extends Document {
     coverage?: string;
     contributor?: string;
     type?: string;
-    // BookFunnel specific fields
-    bookFunnelUploadId?: string;
-    bookFunnelUploadStatus?: string;
-    bookFunnelDownloadUrl?: string;
-    bookFunnelErrorMessage?: string;
-    bookFunnelCampaignId?: string;
-    bookFunnelCampaignStatus?: string;
-    bookFunnelCampaignName?: string;
-    bookFunnelDownloadCount?: number;
   };
   status: BookStatus;
   uploadDate: Date;
@@ -391,14 +429,213 @@ export interface IBook extends Document {
   wordCount?: number;
   readingTime?: number;
   fileUrl: string;
+  // Delivery features
+  isPublic: boolean;
+  allowEmailCapture: boolean;
+  deliverySettings: {
+    requireEmail: boolean;
+    allowAnonymous: boolean;
+    maxDownloads?: number;
+    expiryDate?: Date;
+  };
 }
 
 export enum BookStatus {
+  DRAFT = "draft",
   UPLOADING = "uploading",
   PROCESSING = "processing",
   READY = "ready",
   ERROR = "error",
   DELETED = "deleted",
+}
+
+export enum BookFileType {
+  EPUB = "epub",
+  PDF = "pdf",
+  AUDIO = "audio",
+}
+
+export enum BookType {
+  ADVANCE_COPY = "advance_copy",
+  EXCERPT = "excerpt",
+  FULL_BOOK = "full_book",
+  NOVELLA = "novella",
+  PREVIEW = "preview",
+  SAMPLE = "sample",
+  SHORT_STORY = "short_story",
+  TEASER = "teaser",
+  OTHER = "other",
+}
+
+// Delivery Link Types
+export interface IDeliveryLink extends Document {
+  _id: string;
+  bookId: string;
+  userId: string;
+  title: string;
+  description?: string;
+  slug: string;
+  isActive: boolean;
+  settings: {
+    requireEmail: boolean;
+    allowAnonymous: boolean;
+    maxDownloads?: number;
+    expiryDate?: Date;
+    password?: string;
+  };
+  analytics: {
+    totalViews: number;
+    totalDownloads: number;
+    uniqueVisitors: number;
+    emailCaptures: number;
+    lastAccessed?: Date;
+  };
+  createdAt: Date;
+  updatedAt: Date;
+  url: string;
+}
+
+// Landing Page Types
+export interface ILandingPage extends Document {
+  _id: string;
+  bookId: string;
+  userId: string;
+  title: string;
+  description?: string;
+  slug: string;
+  isActive: boolean;
+  design: {
+    theme: "default" | "minimal" | "modern" | "classic";
+    primaryColor: string;
+    backgroundColor: string;
+    textColor: string;
+    fontFamily: string;
+    customCSS?: string;
+  };
+  content: {
+    heroTitle: string;
+    heroSubtitle?: string;
+    heroImage?: string;
+    features?: string[];
+    testimonials?: Array<{
+      name: string;
+      text: string;
+      avatar?: string;
+    }>;
+    callToAction: {
+      text: string;
+      buttonText: string;
+      buttonColor: string;
+    };
+    aboutAuthor?: {
+      name: string;
+      bio: string;
+      avatar?: string;
+      socialLinks?: {
+        twitter?: string;
+        facebook?: string;
+        instagram?: string;
+        website?: string;
+      };
+    };
+    faq?: Array<{
+      question: string;
+      answer: string;
+    }>;
+  };
+  seo: {
+    metaTitle?: string;
+    metaDescription?: string;
+    metaKeywords?: string[];
+    ogImage?: string;
+  };
+  analytics: {
+    totalViews: number;
+    totalConversions: number;
+    uniqueVisitors: number;
+    lastAccessed?: Date;
+  };
+  createdAt: Date;
+  updatedAt: Date;
+  url: string;
+}
+
+// Analytics Types
+export interface IBookAnalytics extends Document {
+  _id: string;
+  bookId: string;
+  userId: string;
+  deliveryLinkId?: string;
+  landingPageId?: string;
+  eventType: AnalyticsEventType;
+  eventData: {
+    timestamp: Date;
+    userAgent?: string;
+    ipAddress?: string;
+    referrer?: string;
+    country?: string;
+    city?: string;
+    device?: string;
+    browser?: string;
+    os?: string;
+    email?: string;
+    downloadUrl?: string;
+    streamDuration?: number;
+    pageViews?: number;
+    conversionType?: string;
+  };
+  createdAt: Date;
+}
+
+export enum AnalyticsEventType {
+  PAGE_VIEW = "page_view",
+  DOWNLOAD = "download",
+  EMAIL_CAPTURE = "email_capture",
+  STREAM_START = "stream_start",
+  STREAM_COMPLETE = "stream_complete",
+  LINK_CLICK = "link_click",
+  CONVERSION = "conversion",
+  BOUNCE = "bounce",
+}
+
+// Email Capture Types
+export interface IEmailCapture extends Document {
+  _id: string;
+  bookId: string;
+  userId: string;
+  deliveryLinkId?: string;
+  landingPageId?: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  fullName?: string; // Virtual field for full name
+  bookTitle?: string; // Virtual field for book title
+  source: string;
+  metadata: {
+    ipAddress?: string;
+    userAgent?: string;
+    country?: string;
+    city?: string;
+    referrer?: string;
+    utmSource?: string;
+    utmMedium?: string;
+    utmCampaign?: string;
+    utmTerm?: string;
+    utmContent?: string;
+  };
+  status: EmailCaptureStatus;
+  tags: string[];
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export enum EmailCaptureStatus {
+  NEW = "new",
+  CONTACTED = "contacted",
+  CONVERTED = "converted",
+  UNSUBSCRIBED = "unsubscribed",
+  BOUNCED = "bounced",
 }
 
 // Integration Types
@@ -426,6 +663,17 @@ export enum IntegrationProvider {
   AMAZON_KDP = "amazon_kdp",
   DRAFT2DIGITAL = "draft2digital",
   SMASHWORDS = "smashwords",
+  // Email Marketing Providers
+  MAILCHIMP = "mailchimp",
+  CONVERTKIT = "convertkit",
+  ACTIVE_CAMPAIGN = "active_campaign",
+  DRIP = "drip",
+  SENDINBLUE = "sendinblue",
+  // Payment Gateways
+  STRIPE = "stripe",
+  PAYPAL = "paypal",
+  SQUARE = "square",
+  RAZORPAY = "razorpay",
 }
 
 export enum IntegrationStatus {
