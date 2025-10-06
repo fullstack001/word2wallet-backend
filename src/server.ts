@@ -57,7 +57,18 @@ setWebSocketManager(wsManager);
 
 // Security middleware
 app.use(helmet());
-app.use(compression());
+// Compression - but exclude webhook endpoints to preserve raw body
+app.use(
+  compression({
+    filter: (req, res) => {
+      // Don't compress webhook endpoints
+      if (req.path.startsWith("/api/webhooks")) {
+        return false;
+      }
+      return compression.filter(req, res);
+    },
+  })
+);
 
 // Rate limiting - more lenient for development
 const limiter = rateLimit({
@@ -128,7 +139,17 @@ app.use(
 );
 
 // Raw body parsing for Stripe webhooks - MUST be before express.json()
-app.use("/api/webhooks/stripe", express.raw({ type: "application/json" }));
+// This captures the raw body as a Buffer for signature verification
+app.use(
+  "/api/webhooks/stripe",
+  express.raw({
+    type: "application/json",
+    verify: (req: any, res, buf) => {
+      // Store raw body for Stripe signature verification
+      req.rawBody = buf;
+    },
+  })
+);
 
 // Body parsing middleware
 app.use(express.json({ limit: "100mb" }));

@@ -9,12 +9,40 @@ export class WebhookController {
   static async handleWebhook(req: Request, res: Response, next: NextFunction) {
     try {
       const sig = req.headers["stripe-signature"] as string;
-      const payload = req.body;
+
+      // Use rawBody if available, otherwise fall back to req.body
+      const payload = (req as any).rawBody || req.body;
+
+      // Debug logging
+      console.log("=== WEBHOOK DEBUG ===");
+      console.log("Payload type:", typeof payload);
+      console.log("Payload is Buffer:", Buffer.isBuffer(payload));
+      console.log(
+        "Payload length:",
+        Buffer.isBuffer(payload) ? payload.length : "N/A"
+      );
+      console.log("Signature present:", !!sig);
+      console.log(
+        "Webhook secret present:",
+        !!process.env.STRIPE_WEBHOOK_SECRET
+      );
+      console.log(
+        "Webhook secret (first 10 chars):",
+        process.env.STRIPE_WEBHOOK_SECRET?.substring(0, 10)
+      );
 
       if (!sig) {
         return res.status(400).json({
           success: false,
           message: "Missing stripe-signature header",
+        });
+      }
+
+      if (!Buffer.isBuffer(payload)) {
+        console.error("Payload is not a Buffer! Type:", typeof payload);
+        return res.status(400).json({
+          success: false,
+          message: "Invalid payload format - must be raw buffer",
         });
       }
 
