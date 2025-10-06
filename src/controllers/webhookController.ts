@@ -22,6 +22,7 @@ export class WebhookController {
         Buffer.isBuffer(payload) ? payload.length : "N/A"
       );
       console.log("Signature present:", !!sig);
+      console.log("Signature value:", sig);
       console.log(
         "Webhook secret present:",
         !!process.env.STRIPE_WEBHOOK_SECRET
@@ -30,6 +31,23 @@ export class WebhookController {
         "Webhook secret (first 10 chars):",
         process.env.STRIPE_WEBHOOK_SECRET?.substring(0, 10)
       );
+
+      // Log first 200 chars of payload for debugging
+      if (Buffer.isBuffer(payload)) {
+        const crypto = require("crypto");
+        console.log(
+          "Payload preview (first 200 chars):",
+          payload.toString("utf8").substring(0, 200)
+        );
+        console.log(
+          "Payload SHA256:",
+          crypto
+            .createHash("sha256")
+            .update(payload)
+            .digest("hex")
+            .substring(0, 20)
+        );
+      }
 
       if (!sig) {
         return res.status(400).json({
