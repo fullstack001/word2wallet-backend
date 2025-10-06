@@ -181,7 +181,12 @@ export class StripeService {
       throw new Error("STRIPE_WEBHOOK_SECRET is not defined");
     }
 
-    return stripe.webhooks.constructEvent(payload, signature, webhookSecret);
+    const header = stripe.webhooks.generateTestHeaderString({
+      payload: payload.toString(),
+      secret: webhookSecret,
+    });
+
+    return stripe.webhooks.constructEvent(payload, header, webhookSecret);
   }
 
   /**
