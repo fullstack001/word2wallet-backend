@@ -12,6 +12,10 @@ export interface IEmailCapture {
   fullName?: string; // Virtual field for full name
   bookTitle?: string; // Virtual field for book title
   source: string; // Where the email was captured (landing page, delivery link, etc.)
+  isConfirmed: boolean; // Email confirmation status
+  confirmationToken?: string; // Token for email confirmation
+  confirmationTokenExpiry?: Date; // Expiry date for confirmation token
+  confirmedAt?: Date; // When the email was confirmed
   metadata: {
     ipAddress?: string;
     userAgent?: string;
@@ -81,6 +85,20 @@ const emailCaptureSchema = new Schema<IEmailCapture>(
       required: [true, "Source is required"],
       trim: true,
       maxlength: [100, "Source cannot exceed 100 characters"],
+    },
+    isConfirmed: {
+      type: Boolean,
+      default: false,
+    },
+    confirmationToken: {
+      type: String,
+      sparse: true, // Allow multiple null values
+    },
+    confirmationTokenExpiry: {
+      type: Date,
+    },
+    confirmedAt: {
+      type: Date,
     },
     metadata: {
       ipAddress: {

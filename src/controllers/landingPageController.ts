@@ -1,15 +1,19 @@
 import { Request, Response } from "express";
 import { validationResult } from "express-validator";
-import {
-  ILandingPage,
-  ApiResponse,
-  AuthRequest,
-  AnalyticsEventType,
-} from "../types";
+import { ApiResponse, AuthRequest, AnalyticsEventType } from "../types";
 import { LandingPage } from "../models/LandingPage";
 import { Book } from "../models/Book";
 import { BookAnalytics } from "../models/BookAnalytics";
 import { EmailCapture } from "../models/EmailCapture";
+import { EmailConfirmationService } from "../services/emailConfirmationService";
+import { BookDeliveryService } from "../services/bookDeliveryService";
+import { getStorageService } from "../services/storageService";
+import {
+  CreateLandingPageRequest,
+  UpdateLandingPageRequest,
+  LandingPageListQuery,
+  LandingPageType,
+} from "../types/landingPage";
 
 export class LandingPageController {
   /**
@@ -31,7 +35,7 @@ export class LandingPageController {
       }
 
       const userId = req.user!._id;
-      const { bookId, title, description, design, content, seo } = req.body;
+      const { bookId, type, ...pageData }: CreateLandingPageRequest = req.body;
 
       // Verify book exists and belongs to user
       const book = await Book.findOne({ _id: bookId, userId });
@@ -43,11 +47,31 @@ export class LandingPageController {
         return;
       }
 
-      // Generate unique slug
-      const baseSlug = title
+      // Generate unique slug based on type and page name
+      let baseSlug: string;
+      switch (type) {
+        case "simple_download":
+          baseSlug = pageData.downloadPage?.pageName || "download";
+          break;
+        case "email_signup":
+          baseSlug = pageData.emailSignupPage?.pageName || "signup";
+          break;
+        case "restricted":
+          baseSlug = pageData.restrictedPage?.pageName || "restricted";
+          break;
+        case "universal_link":
+          baseSlug = pageData.universalBookLink?.linkName || "universal";
+          break;
+        default:
+          baseSlug = "landing";
+      }
+
+      // Clean and create slug
+      baseSlug = baseSlug
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "");
+
       let slug = baseSlug;
       let counter = 1;
 
@@ -56,50 +80,47 @@ export class LandingPageController {
         counter++;
       }
 
-      // Create landing page
-      const landingPage = new LandingPage({
+      // Create landing page with type-specific data
+      // Only include the nested object relevant to the landing page type
+      const landingPageData: any = {
         bookId,
         userId,
-        title,
-        description,
+        type,
         slug,
-        design: {
-          theme: design?.theme || "default",
-          primaryColor: design?.primaryColor || "#3B82F6",
-          backgroundColor: design?.backgroundColor || "#FFFFFF",
-          textColor: design?.textColor || "#1F2937",
-          fontFamily: design?.fontFamily || "Inter",
-          customCSS: design?.customCSS,
-        },
-        content: {
-          heroTitle: content.heroTitle,
-          heroSubtitle: content.heroSubtitle,
-          heroImage: content.heroImage,
-          features: content.features || [],
-          testimonials: content.testimonials || [],
-          callToAction: {
-            text: content.callToAction.text,
-            buttonText: content.callToAction.buttonText,
-            buttonColor: content.callToAction.buttonColor || "#3B82F6",
-          },
-          aboutAuthor: content.aboutAuthor,
-          faq: content.faq || [],
-        },
-        seo: {
-          metaTitle: seo?.metaTitle,
-          metaDescription: seo?.metaDescription,
-          metaKeywords: seo?.metaKeywords || [],
-          ogImage: seo?.ogImage,
-        },
-      });
+      };
 
+      // Add only the type-specific settings based on landing page type
+      switch (type) {
+        case "simple_download":
+          if (pageData.downloadPage) {
+            landingPageData.downloadPage = pageData.downloadPage;
+          }
+          break;
+        case "email_signup":
+          if (pageData.emailSignupPage) {
+            landingPageData.emailSignupPage = pageData.emailSignupPage;
+          }
+          break;
+        case "restricted":
+          if (pageData.restrictedPage) {
+            landingPageData.restrictedPage = pageData.restrictedPage;
+          }
+          break;
+        case "universal_link":
+          if (pageData.universalBookLink) {
+            landingPageData.universalBookLink = pageData.universalBookLink;
+          }
+          break;
+      }
+
+      const landingPage = new LandingPage(landingPageData);
       await landingPage.save();
 
       res.status(201).json({
         success: true,
         message: "Landing page created successfully",
-        data: landingPage as any,
-      } as ApiResponse<ILandingPage>);
+        data: landingPage,
+      } as ApiResponse);
     } catch (error) {
       console.error("Create landing page error:", error);
       res.status(500).json({
@@ -111,12 +132,18 @@ export class LandingPageController {
   }
 
   /**
-   * Get all landing pages for a user
+   * Get all landing pages for a user with filtering
    */
   static async getLandingPages(req: AuthRequest, res: Response): Promise<void> {
     try {
       const userId = req.user!._id;
-      const { page = 1, limit = 10, bookId, isActive } = req.query;
+      const {
+        page = 1,
+        limit = 10,
+        bookId,
+        type,
+        isActive,
+      }: LandingPageListQuery = req.query;
 
       const skip = (Number(page) - 1) * Number(limit);
       const query: any = { userId };
@@ -125,8 +152,12 @@ export class LandingPageController {
         query.bookId = bookId as string;
       }
 
+      if (type) {
+        query.type = type as LandingPageType;
+      }
+
       if (isActive !== undefined) {
-        query.isActive = isActive === "true";
+        query.isActive = String(isActive) === "true";
       }
 
       const landingPages = await LandingPage.find(query)
@@ -137,11 +168,25 @@ export class LandingPageController {
 
       const total = await LandingPage.countDocuments(query);
 
+      // Transform data for frontend
+      const transformedPages = landingPages.map((page) => ({
+        id: page._id,
+        title: (page as any).title, // Virtual field
+        type: page.type,
+        slug: page.slug,
+        url: (page as any).url, // Virtual field
+        isActive: page.isActive,
+        analytics: page.analytics,
+        book: page.bookId,
+        createdAt: page.createdAt,
+        updatedAt: page.updatedAt,
+      }));
+
       res.json({
         success: true,
         message: "Landing pages retrieved successfully",
         data: {
-          landingPages,
+          landingPages: transformedPages,
           pagination: {
             page: Number(page),
             limit: Number(limit),
@@ -184,8 +229,8 @@ export class LandingPageController {
       res.json({
         success: true,
         message: "Landing page retrieved successfully",
-        data: landingPage as any,
-      } as ApiResponse<ILandingPage>);
+        data: landingPage,
+      } as ApiResponse);
     } catch (error) {
       console.error("Get landing page error:", error);
       res.status(500).json({
@@ -199,10 +244,7 @@ export class LandingPageController {
   /**
    * Update a landing page
    */
-  static async updateLandingPage(
-    req: AuthRequest,
-    res: Response
-  ): Promise<void> {
+  static async updateLandingPage(req: Request, res: Response): Promise<void> {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -214,12 +256,11 @@ export class LandingPageController {
         return;
       }
 
-      const userId = req.user!._id;
       const { id } = req.params;
-      const updateData = req.body;
+      const updateData: UpdateLandingPageRequest = req.body;
 
       const landingPage = await LandingPage.findOneAndUpdate(
-        { _id: id, userId },
+        { _id: id },
         updateData,
         { new: true, runValidators: true }
       ).populate("bookId", "title author coverImageUrl");
@@ -235,8 +276,8 @@ export class LandingPageController {
       res.json({
         success: true,
         message: "Landing page updated successfully",
-        data: landingPage as any,
-      } as ApiResponse<ILandingPage>);
+        data: landingPage,
+      } as ApiResponse);
     } catch (error) {
       console.error("Update landing page error:", error);
       res.status(500).json({
@@ -374,10 +415,10 @@ export class LandingPageController {
    */
   static async viewLandingPage(req: Request, res: Response): Promise<void> {
     try {
-      const { slug } = req.params;
+      const { id } = req.params;
 
       const landingPage = await LandingPage.findOne({
-        slug,
+        _id: id,
         isActive: true,
       }).populate("bookId");
 
@@ -423,23 +464,24 @@ export class LandingPageController {
         data: {
           landingPage: {
             _id: landingPage._id,
-            title: landingPage.title,
-            description: landingPage.description,
-            design: landingPage.design,
-            content: landingPage.content,
-            seo: landingPage.seo,
-            url: landingPage.toJSON().url,
+            type: landingPage.type,
+            title: (landingPage as any).title,
+            url: (landingPage as any).url,
+            downloadPage: landingPage.downloadPage,
+            emailSignupPage: landingPage.emailSignupPage,
+            restrictedPage: landingPage.restrictedPage,
+            universalBookLink: landingPage.universalBookLink,
           },
           book: {
             _id: book._id,
             title: book.title,
             author: book.author,
             description: book.description,
-            coverImageUrl: book.coverImageUrl,
             fileType: book.fileType,
             pageCount: book.pageCount,
             wordCount: book.wordCount,
             readingTime: book.readingTime,
+            coverImageUrl: book.coverImageKey,
           },
         },
       } as ApiResponse);
@@ -461,7 +503,7 @@ export class LandingPageController {
     res: Response
   ): Promise<void> {
     try {
-      const { slug } = req.params;
+      const { id } = req.params;
       const {
         email,
         firstName,
@@ -470,7 +512,7 @@ export class LandingPageController {
       } = req.body;
 
       const landingPage = await LandingPage.findOne({
-        slug,
+        _id: id,
         isActive: true,
       }).populate("bookId");
 
@@ -491,6 +533,13 @@ export class LandingPageController {
         return;
       }
 
+      // Check if email confirmation is required for this landing page
+      const needsConfirmation =
+        landingPage.type === "email_signup" &&
+        landingPage.emailSignupPage?.confirmEmail;
+
+      let emailCaptureId: string | undefined;
+
       // Capture email if provided
       if (email && book.allowEmailCapture) {
         try {
@@ -500,20 +549,23 @@ export class LandingPageController {
           });
 
           if (!existingCapture) {
-            await EmailCapture.create({
+            const newCapture = await EmailCapture.create({
               bookId: book._id,
               userId: landingPage.userId,
               landingPageId: landingPage._id,
               email: email.toLowerCase(),
               firstName,
               lastName,
-              source: `landing_page_${landingPage.slug}`,
+              source: `landing_page_${landingPage._id}`,
+              isConfirmed: !needsConfirmation, // Auto-confirm if not needed
               metadata: {
                 ipAddress: req.ip,
                 userAgent: req.get("User-Agent"),
                 referrer: req.get("Referer"),
               },
             });
+
+            emailCaptureId = newCapture._id;
 
             // Track email capture
             await BookAnalytics.create({
@@ -529,6 +581,27 @@ export class LandingPageController {
                 referrer: req.get("Referer"),
               },
             });
+            console.log("needsConfirmation", needsConfirmation);
+
+            // Send confirmation email if needed
+            if (needsConfirmation) {
+              try {
+                await EmailConfirmationService.sendConfirmationEmail(
+                  emailCaptureId,
+                  book.title,
+                  book.author
+                );
+              } catch (emailSendError) {
+                console.error(
+                  "Failed to send confirmation email:",
+                  emailSendError
+                );
+                // Continue even if email sending fails - user can still use the system
+                // TODO: Set up proper email service (Mailgun, SendGrid, etc.)
+              }
+            }
+          } else {
+            emailCaptureId = existingCapture._id;
           }
         } catch (emailError) {
           console.error("Email capture error:", emailError);
@@ -558,10 +631,13 @@ export class LandingPageController {
 
       res.json({
         success: true,
-        message: "Conversion tracked successfully",
+        message: needsConfirmation
+          ? "Please check your email to confirm and get your book"
+          : "Conversion tracked successfully",
         data: {
           conversionType,
           email: email ? "captured" : "not_provided",
+          needsConfirmation,
         },
       } as ApiResponse);
     } catch (error) {
@@ -569,6 +645,457 @@ export class LandingPageController {
       res.status(500).json({
         success: false,
         message: "Failed to track conversion",
+        error: error instanceof Error ? error.message : "Unknown error",
+      } as ApiResponse);
+    }
+  }
+
+  /**
+   * Duplicate a landing page
+   */
+  static async duplicateLandingPage(
+    req: AuthRequest,
+    res: Response
+  ): Promise<void> {
+    try {
+      const userId = req.user!._id;
+      const { id } = req.params;
+
+      const originalPage = await LandingPage.findOne({ _id: id, userId });
+      if (!originalPage) {
+        res.status(404).json({
+          success: false,
+          message: "Landing page not found",
+        } as ApiResponse);
+        return;
+      }
+
+      // Create a copy with a new slug
+      const duplicatedData = originalPage.toObject();
+      delete (duplicatedData as any)._id;
+      delete (duplicatedData as any).createdAt;
+      delete (duplicatedData as any).updatedAt;
+
+      // Generate new slug
+      const baseSlug = `${duplicatedData.slug}-copy`;
+      let newSlug = baseSlug;
+      let counter = 1;
+
+      while (await LandingPage.findOne({ slug: newSlug })) {
+        newSlug = `${baseSlug}-${counter}`;
+        counter++;
+      }
+
+      duplicatedData.slug = newSlug;
+      duplicatedData.analytics = {
+        totalViews: 0,
+        totalConversions: 0,
+        uniqueVisitors: 0,
+      };
+
+      const duplicatedPage = new LandingPage(duplicatedData);
+      await duplicatedPage.save();
+
+      res.status(201).json({
+        success: true,
+        message: "Landing page duplicated successfully",
+        data: duplicatedPage,
+      } as ApiResponse);
+    } catch (error) {
+      console.error("Duplicate landing page error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to duplicate landing page",
+        error: error instanceof Error ? error.message : "Unknown error",
+      } as ApiResponse);
+    }
+  }
+
+  /**
+   * Toggle landing page active status
+   */
+  static async toggleLandingPageStatus(
+    req: AuthRequest,
+    res: Response
+  ): Promise<void> {
+    try {
+      const userId = req.user!._id;
+      const { id } = req.params;
+
+      const landingPage = await LandingPage.findOne({ _id: id, userId });
+      if (!landingPage) {
+        res.status(404).json({
+          success: false,
+          message: "Landing page not found",
+        } as ApiResponse);
+        return;
+      }
+
+      landingPage.isActive = !landingPage.isActive;
+      await landingPage.save();
+
+      res.json({
+        success: true,
+        message: `Landing page ${
+          landingPage.isActive ? "activated" : "deactivated"
+        } successfully`,
+        data: {
+          id: landingPage._id,
+          isActive: landingPage.isActive,
+        },
+      } as ApiResponse);
+    } catch (error) {
+      console.error("Toggle landing page status error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to toggle landing page status",
+        error: error instanceof Error ? error.message : "Unknown error",
+      } as ApiResponse);
+    }
+  }
+
+  /**
+   * Confirm email with token (public endpoint)
+   */
+  static async confirmEmailToken(req: Request, res: Response): Promise<void> {
+    try {
+      const { token } = req.params;
+
+      const result = await EmailConfirmationService.confirmEmail(token);
+
+      // Calculate expiration days (default 14 days from now)
+      const expirationDays = 13;
+
+      // Check available file formats
+      const availableFormats = {
+        epub: !!(result.book.epubFile?.fileKey || result.book.fileKey),
+        pdf: !!result.book.pdfFile?.fileKey,
+        audio: !!result.book.audioFile?.fileKey,
+      };
+
+      res.json({
+        success: true,
+        message: "Email confirmed successfully",
+        data: {
+          book: {
+            _id: result.book._id,
+            title: result.book.title,
+            author: result.book.author,
+            coverImageUrl: result.book.coverImageUrl,
+          },
+          downloadUrl: result.downloadUrl,
+          expirationDays,
+          userEmail: result.emailCapture.email,
+          availableFormats,
+        },
+      } as ApiResponse);
+    } catch (error) {
+      console.error("Confirm email error:", error);
+      res.status(400).json({
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to confirm email. The link may have expired.",
+        error: error instanceof Error ? error.message : "Unknown error",
+      } as ApiResponse);
+    }
+  }
+
+  /**
+   * Send book file via email (public endpoint)
+   */
+  static async sendBookViaEmail(req: Request, res: Response): Promise<void> {
+    try {
+      const { token } = req.params;
+      const { email, format } = req.body;
+
+      // Validate format
+      if (!format || (format !== "epub" && format !== "pdf")) {
+        res.status(400).json({
+          success: false,
+          message: "Invalid format. Must be 'epub' or 'pdf'",
+        } as ApiResponse);
+        return;
+      }
+
+      // Validate email
+      if (!email) {
+        res.status(400).json({
+          success: false,
+          message: "Email is required",
+        } as ApiResponse);
+        return;
+      }
+
+      // Find email capture by token to get book info
+      const emailCapture = await EmailCapture.findOne({
+        confirmationToken: token,
+      }).populate("bookId");
+
+      if (!emailCapture) {
+        res.status(404).json({
+          success: false,
+          message: "Invalid token",
+        } as ApiResponse);
+        return;
+      }
+
+      const book = emailCapture.bookId as any;
+      if (!book) {
+        res.status(404).json({
+          success: false,
+          message: "Book not found",
+        } as ApiResponse);
+        return;
+      }
+
+      // Check if format is available
+      const hasEpub = !!(book.epubFile?.fileKey || book.fileKey);
+      const hasPdf = !!book.pdfFile?.fileKey;
+
+      if (format === "epub" && !hasEpub) {
+        res.status(400).json({
+          success: false,
+          message: "EPUB format not available for this book",
+        } as ApiResponse);
+        return;
+      }
+
+      if (format === "pdf" && !hasPdf) {
+        res.status(400).json({
+          success: false,
+          message: "PDF format not available for this book",
+        } as ApiResponse);
+        return;
+      }
+
+      // Send book via email
+      await BookDeliveryService.sendBookViaEmail(book, email, format);
+
+      // Track analytics
+      await BookAnalytics.create({
+        bookId: book._id,
+        userId: book.userId,
+        landingPageId: emailCapture.landingPageId,
+        eventType: AnalyticsEventType.DOWNLOAD,
+        eventData: {
+          timestamp: new Date(),
+          email: email.toLowerCase(),
+          format,
+          deliveryMethod: "email",
+        },
+      });
+
+      res.json({
+        success: true,
+        message: `Book sent successfully to ${email}`,
+        data: {
+          format,
+          email,
+        },
+      } as ApiResponse);
+    } catch (error) {
+      console.error("Send book via email error:", error);
+      res.status(500).json({
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to send book via email",
+        error: error instanceof Error ? error.message : "Unknown error",
+      } as ApiResponse);
+    }
+  }
+
+  /**
+   * Download book file (public endpoint)
+   */
+  static async downloadBook(req: Request, res: Response): Promise<void> {
+    try {
+      const { token } = req.params;
+      const { format } = req.query;
+
+      // Validate format
+      if (!format || (format !== "epub" && format !== "pdf")) {
+        res.status(400).json({
+          success: false,
+          message: "Invalid format. Must be 'epub' or 'pdf'",
+        } as ApiResponse);
+        return;
+      }
+
+      // Find email capture by token
+      const emailCapture = await EmailCapture.findOne({
+        confirmationToken: token,
+      }).populate("bookId");
+
+      if (!emailCapture) {
+        res.status(404).json({
+          success: false,
+          message: "Invalid token",
+        } as ApiResponse);
+        return;
+      }
+
+      // Check if token has expired
+      if (
+        emailCapture.confirmationTokenExpiry &&
+        emailCapture.confirmationTokenExpiry < new Date()
+      ) {
+        res.status(400).json({
+          success: false,
+          message: "Download link has expired",
+        } as ApiResponse);
+        return;
+      }
+
+      const book = emailCapture.bookId as any;
+      if (!book) {
+        res.status(404).json({
+          success: false,
+          message: "Book not found",
+        } as ApiResponse);
+        return;
+      }
+
+      // Get the file key based on format
+      let fileKey: string | undefined;
+      if (format === "epub") {
+        fileKey = book.epubFile?.fileKey || book.fileKey;
+      } else if (format === "pdf") {
+        fileKey = book.pdfFile?.fileKey;
+      }
+
+      if (!fileKey) {
+        res.status(400).json({
+          success: false,
+          message: `${format.toUpperCase()} format not available for this book`,
+        } as ApiResponse);
+        return;
+      }
+
+      // Generate download URL
+      const storageService = getStorageService();
+      const downloadUrl = await storageService.generatePresignedDownloadUrl(
+        fileKey
+      );
+
+      // Redirect to the download URL
+      res.redirect(downloadUrl);
+    } catch (error) {
+      console.error("Download book error:", error);
+      res.status(500).json({
+        success: false,
+        message:
+          error instanceof Error ? error.message : "Failed to download book",
+        error: error instanceof Error ? error.message : "Unknown error",
+      } as ApiResponse);
+    }
+  }
+
+  /**
+   * Simple download endpoint for simple_download landing pages
+   * Allows direct download without email capture/token
+   */
+  static async simpleDownload(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { format } = req.query;
+
+      // Validate format
+      if (!format || (format !== "epub" && format !== "pdf")) {
+        res.status(400).json({
+          success: false,
+          message: "Invalid format. Must be 'epub' or 'pdf'",
+        } as ApiResponse);
+        return;
+      }
+
+      // Find landing page
+      const landingPage = await LandingPage.findById(id).populate("bookId");
+
+      if (!landingPage) {
+        res.status(404).json({
+          success: false,
+          message: "Landing page not found",
+        } as ApiResponse);
+        return;
+      }
+
+      // Check if landing page is active
+      if (!landingPage.isActive) {
+        res.status(403).json({
+          success: false,
+          message: "This landing page is not active",
+        } as ApiResponse);
+        return;
+      }
+
+      // Verify it's a simple_download type
+      if (landingPage.type !== "simple_download") {
+        res.status(403).json({
+          success: false,
+          message: "This endpoint only supports simple_download landing pages",
+        } as ApiResponse);
+        return;
+      }
+
+      const book = landingPage.bookId as any;
+      if (!book) {
+        res.status(404).json({
+          success: false,
+          message: "Book not found",
+        } as ApiResponse);
+        return;
+      }
+
+      // Get the file key based on format
+      let fileKey: string | undefined;
+      if (format === "epub") {
+        fileKey = book.epubFile?.fileKey || book.fileKey;
+      } else if (format === "pdf") {
+        fileKey = book.pdfFile?.fileKey;
+      }
+
+      if (!fileKey) {
+        res.status(400).json({
+          success: false,
+          message: `${format.toUpperCase()} format not available for this book`,
+        } as ApiResponse);
+        return;
+      }
+
+      // Generate download URL
+      const storageService = getStorageService();
+      const downloadUrl = await storageService.generatePresignedDownloadUrl(
+        fileKey
+      );
+
+      // Track the download in analytics
+      await BookAnalytics.create({
+        bookId: book._id,
+        userId: landingPage.userId,
+        eventType: "download" as AnalyticsEventType,
+        metadata: {
+          source: "simple_download_landing_page",
+          landingPageId: landingPage._id,
+          format: format,
+        },
+      });
+
+      // Increment conversion count
+      landingPage.analytics.totalConversions += 1;
+      await landingPage.save();
+
+      // Redirect to the download URL
+      res.redirect(downloadUrl);
+    } catch (error) {
+      console.error("Simple download error:", error);
+      res.status(500).json({
+        success: false,
+        message:
+          error instanceof Error ? error.message : "Failed to download book",
         error: error instanceof Error ? error.message : "Unknown error",
       } as ApiResponse);
     }

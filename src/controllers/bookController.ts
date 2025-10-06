@@ -1227,4 +1227,188 @@ export class BookController {
       stream.on("error", reject);
     });
   }
+
+  /**
+   * Get book by ID (public endpoint, no authentication required)
+   */
+  static async getPublicBook(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+
+      const book = await Book.findOne({
+        _id: id,
+      }).select("-__v");
+
+      if (!book) {
+        res.status(404).json({
+          success: false,
+          message: "Book not found",
+        } as ApiResponse);
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Book retrieved successfully",
+        data: book.toObject() as unknown as IBook,
+      } as ApiResponse<IBook>);
+    } catch (error) {
+      console.error("Get public book error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to retrieve book",
+        error: error instanceof Error ? error.message : "Unknown error",
+      } as ApiResponse);
+    }
+  }
+
+  /**
+   * Stream book file (public endpoint, no authentication required)
+   */
+  static async streamPublicBookFile(
+    req: Request,
+    res: Response
+  ): Promise<void> {
+    try {
+      const { id, fileType } = req.params;
+
+      // Validate file type
+      if (!["epub", "pdf", "audio"].includes(fileType)) {
+        res.status(400).json({
+          success: false,
+          message: "Invalid file type. Must be 'epub', 'pdf', or 'audio'",
+        } as ApiResponse);
+        return;
+      }
+
+      const book = await Book.findOne({
+        _id: id,
+      });
+
+      if (!book) {
+        res.status(404).json({
+          success: false,
+          message: "Book not found",
+        } as ApiResponse);
+        return;
+      }
+
+      // Determine which file to serve based on fileType
+      let fileKey: string | undefined;
+      let fileName: string | undefined;
+      let mimeType: string;
+
+      if (fileType === "epub") {
+        fileKey = book.epubFile?.fileKey || book.fileKey;
+        fileName = book.epubFile?.fileName || book.fileName;
+        mimeType = "application/epub+zip";
+      } else if (fileType === "pdf") {
+        fileKey = book.pdfFile?.fileKey;
+        fileName = book.pdfFile?.fileName;
+        mimeType = "application/pdf";
+      } else if (fileType === "audio") {
+        fileKey = book.audioFile?.fileKey;
+        fileName = book.audioFile?.fileName;
+        // Determine audio mime type from file extension
+        const ext = fileName?.split(".").pop()?.toLowerCase();
+        if (ext === "mp3") {
+          mimeType = "audio/mpeg";
+        } else if (ext === "m4a") {
+          mimeType = "audio/mp4";
+        } else if (ext === "wav") {
+          mimeType = "audio/wav";
+        } else if (ext === "aac") {
+          mimeType = "audio/aac";
+        } else {
+          mimeType = "audio/mpeg"; // default
+        }
+      } else {
+        res.status(400).json({
+          success: false,
+          message: "Invalid file type",
+        } as ApiResponse);
+        return;
+      }
+
+      if (!fileKey) {
+        res.status(404).json({
+          success: false,
+          message: `${fileType.toUpperCase()} file not found for this book`,
+        } as ApiResponse);
+        return;
+      }
+
+      // Resolve full file path
+      const normalizedPath =
+        fileKey.startsWith("uploads/") || fileKey.startsWith("uploads\\")
+          ? fileKey
+          : `uploads/${fileKey}`;
+      const fullPath = path.resolve(normalizedPath);
+
+      // Check if file exists
+      if (!fs.existsSync(fullPath)) {
+        res.status(404).json({
+          success: false,
+          message: `File not found: ${fileKey}`,
+        } as ApiResponse);
+        return;
+      }
+
+      // Get file stats
+      const stat = fs.statSync(fullPath);
+      const fileSize = stat.size;
+
+      // Support range requests for streaming (important for audio/video)
+      const range = req.headers.range;
+
+      if (range) {
+        // Parse range header
+        const parts = range.replace(/bytes=/, "").split("-");
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+        const chunkSize = end - start + 1;
+
+        // Create read stream for the range
+        const fileStream = fs.createReadStream(fullPath, { start, end });
+
+        // Set response headers for partial content
+        res.writeHead(206, {
+          "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+          "Accept-Ranges": "bytes",
+          "Content-Length": chunkSize,
+          "Content-Type": mimeType,
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET",
+          "Access-Control-Allow-Headers": "Range, Content-Type",
+          "Access-Control-Expose-Headers":
+            "Content-Range, Content-Length, Accept-Ranges",
+        });
+
+        fileStream.pipe(res);
+      } else {
+        // No range requested, send entire file
+        res.writeHead(200, {
+          "Content-Length": fileSize,
+          "Content-Type": mimeType,
+          "Content-Disposition": `inline; filename="${fileName}"`,
+          "Accept-Ranges": "bytes",
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET",
+          "Access-Control-Allow-Headers": "Range, Content-Type",
+          "Access-Control-Expose-Headers":
+            "Content-Range, Content-Length, Accept-Ranges",
+        });
+
+        const fileStream = fs.createReadStream(fullPath);
+        fileStream.pipe(res);
+      }
+    } catch (error) {
+      console.error("Stream public book file error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to stream book file",
+        error: error instanceof Error ? error.message : "Unknown error",
+      } as ApiResponse);
+    }
+  }
 }

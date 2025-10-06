@@ -12,8 +12,15 @@ import {
 
 const router = Router();
 
-// Get book cover image (public access - no authentication required)
+// Public routes (no authentication required)
+// Get book cover image
 router.get("/:id/cover", BookController.getBookCover);
+
+// Get book by ID (public)
+router.get("/public/:id", BookController.getPublicBook);
+
+// Stream book file (public)
+router.get("/public/:id/file/:fileType", BookController.streamPublicBookFile);
 
 // All other routes require authentication
 router.use(auth);

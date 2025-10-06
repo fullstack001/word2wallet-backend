@@ -1,59 +1,29 @@
 import mongoose, { Schema } from "mongoose";
+import {
+  LandingPageType,
+  LandingPageSettings,
+  DownloadPageSettings,
+  EmailSignupPageSettings,
+  RestrictedPageSettings,
+  UniversalBookLinkSettings,
+} from "../types/landingPage";
 
 export interface ILandingPage {
   _id: string;
   bookId: string;
-  userId: string; // Author who created the landing page
-  title: string;
-  description?: string;
-  slug: string; // Unique URL slug
-  url?: string; // Virtual field for full URL
+  userId: string;
+  type: LandingPageType;
   isActive: boolean;
-  design: {
-    theme: "default" | "minimal" | "modern" | "classic";
-    primaryColor: string;
-    backgroundColor: string;
-    textColor: string;
-    fontFamily: string;
-    customCSS?: string;
-  };
-  content: {
-    heroTitle: string;
-    heroSubtitle?: string;
-    heroImage?: string;
-    features?: string[];
-    testimonials?: Array<{
-      name: string;
-      text: string;
-      avatar?: string;
-    }>;
-    callToAction: {
-      text: string;
-      buttonText: string;
-      buttonColor: string;
-    };
-    aboutAuthor?: {
-      name: string;
-      bio: string;
-      avatar?: string;
-      socialLinks?: {
-        twitter?: string;
-        facebook?: string;
-        instagram?: string;
-        website?: string;
-      };
-    };
-    faq?: Array<{
-      question: string;
-      answer: string;
-    }>;
-  };
-  seo: {
-    metaTitle?: string;
-    metaDescription?: string;
-    metaKeywords?: string[];
-    ogImage?: string;
-  };
+  slug: string;
+  url?: string;
+  title?: string; // Virtual property based on page type
+
+  // Type-specific settings
+  downloadPage?: DownloadPageSettings;
+  emailSignupPage?: EmailSignupPageSettings;
+  restrictedPage?: RestrictedPageSettings;
+  universalBookLink?: UniversalBookLinkSettings;
+
   analytics: {
     totalViews: number;
     totalConversions: number;
@@ -76,16 +46,18 @@ const landingPageSchema = new Schema<ILandingPage>(
       required: [true, "User ID is required"],
       ref: "User",
     },
-    title: {
+    type: {
       type: String,
-      required: [true, "Title is required"],
-      trim: true,
-      maxlength: [200, "Title cannot exceed 200 characters"],
-    },
-    description: {
-      type: String,
-      trim: true,
-      maxlength: [1000, "Description cannot exceed 1000 characters"],
+      required: [true, "Landing page type is required"],
+      enum: {
+        values: [
+          "simple_download",
+          "email_signup",
+          "restricted",
+          "universal_link",
+        ],
+        message: "Invalid landing page type",
+      },
     },
     slug: {
       type: String,
@@ -102,175 +74,492 @@ const landingPageSchema = new Schema<ILandingPage>(
       type: Boolean,
       default: true,
     },
-    design: {
-      theme: {
-        type: String,
-        enum: ["default", "minimal", "modern", "classic"],
-        default: "default",
-      },
-      primaryColor: {
-        type: String,
-        default: "#3B82F6",
-        match: [/^#[0-9A-Fa-f]{6}$/, "Primary color must be a valid hex color"],
-      },
-      backgroundColor: {
-        type: String,
-        default: "#FFFFFF",
-        match: [
-          /^#[0-9A-Fa-f]{6}$/,
-          "Background color must be a valid hex color",
-        ],
-      },
-      textColor: {
-        type: String,
-        default: "#1F2937",
-        match: [/^#[0-9A-Fa-f]{6}$/, "Text color must be a valid hex color"],
-      },
-      fontFamily: {
-        type: String,
-        default: "Inter",
-        enum: ["Inter", "Roboto", "Open Sans", "Lato", "Poppins", "Montserrat"],
-      },
-      customCSS: {
-        type: String,
-        maxlength: [10000, "Custom CSS cannot exceed 10000 characters"],
-      },
-    },
-    content: {
-      heroTitle: {
-        type: String,
-        required: [true, "Hero title is required"],
-        trim: true,
-        maxlength: [200, "Hero title cannot exceed 200 characters"],
-      },
-      heroSubtitle: {
+
+    // Download Page Settings
+    downloadPage: {
+      pageName: {
         type: String,
         trim: true,
-        maxlength: [500, "Hero subtitle cannot exceed 500 characters"],
+        maxlength: [200, "Page name cannot exceed 200 characters"],
       },
-      heroImage: {
-        type: String,
+      expirationDate: {
+        type: Date,
       },
-      features: [
-        {
+      downloadLimit: {
+        type: Number,
+        min: [1, "Download limit must be at least 1"],
+      },
+      landingPageSettings: {
+        pageLayout: {
           type: String,
-          trim: true,
-          maxlength: [200, "Feature cannot exceed 200 characters"],
+          default: "WordToWallet Default",
         },
-      ],
-      testimonials: [
-        {
-          name: {
-            type: String,
-            required: true,
-            trim: true,
-            maxlength: [100, "Testimonial name cannot exceed 100 characters"],
-          },
-          text: {
-            type: String,
-            required: true,
-            trim: true,
-            maxlength: [500, "Testimonial text cannot exceed 500 characters"],
-          },
-          avatar: {
-            type: String,
-          },
+        include3DEffects: {
+          type: Boolean,
+          default: true,
         },
-      ],
-      callToAction: {
-        text: {
+        pageTheme: {
           type: String,
-          required: [true, "CTA text is required"],
-          trim: true,
-          maxlength: [200, "CTA text cannot exceed 200 characters"],
+          default: "WordToWallet Black & Gray",
+        },
+        accentColor: {
+          type: String,
+          default: "Default",
+        },
+        pageTitle: {
+          type: String,
+          default: "Get your FREE copy of {{title}}.",
         },
         buttonText: {
           type: String,
-          required: [true, "CTA button text is required"],
-          trim: true,
-          maxlength: [50, "CTA button text cannot exceed 50 characters"],
+          default: "Get My Book",
         },
-        buttonColor: {
-          type: String,
-          default: "#3B82F6",
-          match: [
-            /^#[0-9A-Fa-f]{6}$/,
-            "Button color must be a valid hex color",
-          ],
+        heading1: {
+          type: {
+            type: String,
+            enum: ["none", "tagline", "newsletter", "get_free_copy", "custom"],
+            default: "tagline",
+          },
+          customText: {
+            type: String,
+            trim: true,
+          },
+        },
+        heading2: {
+          type: {
+            type: String,
+            enum: ["none", "tagline", "subscribers", "get_free_copy", "custom"],
+            default: "get_free_copy",
+          },
+          customText: {
+            type: String,
+            trim: true,
+          },
+        },
+        popupMessage: {
+          type: {
+            type: String,
+            enum: ["none", "default", "custom"],
+            default: "default",
+          },
+          customText: {
+            type: String,
+            trim: true,
+          },
+        },
+        pageText: {
+          type: {
+            type: String,
+            enum: ["none", "book_description", "custom"],
+            default: "book_description",
+          },
+          customText: {
+            type: String,
+            trim: true,
+          },
         },
       },
-      aboutAuthor: {
-        name: {
+      advancedSettings: {
+        allowMultipleDownloads: {
+          type: Boolean,
+          default: false,
+        },
+        requireEmailVerification: {
+          type: Boolean,
+          default: false,
+        },
+        customRedirectUrl: {
           type: String,
           trim: true,
-          maxlength: [100, "Author name cannot exceed 100 characters"],
         },
-        bio: {
-          type: String,
-          trim: true,
-          maxlength: [1000, "Author bio cannot exceed 1000 characters"],
-        },
-        avatar: {
-          type: String,
-        },
-        socialLinks: {
-          twitter: {
-            type: String,
-            trim: true,
-          },
-          facebook: {
-            type: String,
-            trim: true,
-          },
-          instagram: {
-            type: String,
-            trim: true,
-          },
-          website: {
-            type: String,
-            trim: true,
-          },
-        },
-      },
-      faq: [
-        {
-          question: {
-            type: String,
-            required: true,
-            trim: true,
-            maxlength: [200, "FAQ question cannot exceed 200 characters"],
-          },
-          answer: {
-            type: String,
-            required: true,
-            trim: true,
-            maxlength: [1000, "FAQ answer cannot exceed 1000 characters"],
-          },
-        },
-      ],
-    },
-    seo: {
-      metaTitle: {
-        type: String,
-        trim: true,
-        maxlength: [60, "Meta title cannot exceed 60 characters"],
-      },
-      metaDescription: {
-        type: String,
-        trim: true,
-        maxlength: [160, "Meta description cannot exceed 160 characters"],
-      },
-      metaKeywords: [
-        {
-          type: String,
-          trim: true,
-          maxlength: [50, "Meta keyword cannot exceed 50 characters"],
-        },
-      ],
-      ogImage: {
-        type: String,
       },
     },
+
+    // Email Signup Page Settings
+    emailSignupPage: {
+      pageName: {
+        type: String,
+        trim: true,
+        maxlength: [200, "Page name cannot exceed 200 characters"],
+      },
+      mailingListAction: {
+        type: String,
+        enum: ["none", "optional", "required"],
+        default: "required",
+      },
+      integrationList: {
+        type: String,
+        default: "no_list",
+      },
+      expirationDate: {
+        type: Date,
+      },
+      claimLimit: {
+        type: Number,
+        min: [1, "Claim limit must be at least 1"],
+      },
+      askFirstName: {
+        type: Boolean,
+        default: true,
+      },
+      askLastName: {
+        type: Boolean,
+        default: false,
+      },
+      confirmEmail: {
+        type: Boolean,
+        default: true,
+      },
+      landingPageSettings: {
+        pageLayout: {
+          type: String,
+          default: "WordToWallet Default",
+        },
+        include3DEffects: {
+          type: Boolean,
+          default: true,
+        },
+        pageTheme: {
+          type: String,
+          default: "WordToWallet Black & Gray",
+        },
+        accentColor: {
+          type: String,
+          default: "Default",
+        },
+        pageTitle: {
+          type: String,
+          default: "Get your FREE copy of {{title}}.",
+        },
+        buttonText: {
+          type: String,
+          default: "Get My Book",
+        },
+        heading1: {
+          type: {
+            type: String,
+            enum: ["none", "tagline", "newsletter", "get_free_copy", "custom"],
+            default: "tagline",
+          },
+          customText: {
+            type: String,
+            trim: true,
+          },
+        },
+        heading2: {
+          type: {
+            type: String,
+            enum: ["none", "tagline", "subscribers", "get_free_copy", "custom"],
+            default: "get_free_copy",
+          },
+          customText: {
+            type: String,
+            trim: true,
+          },
+        },
+        popupMessage: {
+          type: {
+            type: String,
+            enum: ["none", "default", "custom"],
+            default: "default",
+          },
+          customText: {
+            type: String,
+            trim: true,
+          },
+        },
+        pageText: {
+          type: {
+            type: String,
+            enum: ["none", "book_description", "custom"],
+            default: "book_description",
+          },
+          customText: {
+            type: String,
+            trim: true,
+          },
+        },
+      },
+      thankYouPageSettings: {
+        title: {
+          type: String,
+          trim: true,
+        },
+        message: {
+          type: String,
+          trim: true,
+        },
+        buttonText: {
+          type: String,
+          trim: true,
+        },
+        redirectUrl: {
+          type: String,
+          trim: true,
+        },
+      },
+      advancedSettings: {
+        doubleOptIn: {
+          type: Boolean,
+          default: false,
+        },
+        customThankYouMessage: {
+          type: String,
+          trim: true,
+        },
+        autoResponder: {
+          type: Boolean,
+          default: false,
+        },
+      },
+    },
+
+    // Restricted Page Settings
+    restrictedPage: {
+      pageName: {
+        type: String,
+        trim: true,
+        maxlength: [200, "Page name cannot exceed 200 characters"],
+      },
+      restrictedList: {
+        type: String,
+        trim: true,
+      },
+      redirectUrl: {
+        type: String,
+        trim: true,
+      },
+      expirationDate: {
+        type: Date,
+      },
+      downloadLimit: {
+        type: Number,
+        min: [1, "Download limit must be at least 1"],
+      },
+      confirmEmail: {
+        type: Boolean,
+        default: true,
+      },
+      landingPageSettings: {
+        pageLayout: {
+          type: String,
+          default: "WordToWallet Default",
+        },
+        include3DEffects: {
+          type: Boolean,
+          default: true,
+        },
+        pageTheme: {
+          type: String,
+          default: "WordToWallet Black & Gray",
+        },
+        accentColor: {
+          type: String,
+          default: "Default",
+        },
+        pageTitle: {
+          type: String,
+          default: "Get your FREE copy of {{title}}.",
+        },
+        buttonText: {
+          type: String,
+          default: "Get My Book",
+        },
+        heading1: {
+          type: {
+            type: String,
+            enum: ["none", "tagline", "newsletter", "get_free_copy", "custom"],
+            default: "tagline",
+          },
+          customText: {
+            type: String,
+            trim: true,
+          },
+        },
+        heading2: {
+          type: {
+            type: String,
+            enum: ["none", "tagline", "subscribers", "get_free_copy", "custom"],
+            default: "get_free_copy",
+          },
+          customText: {
+            type: String,
+            trim: true,
+          },
+        },
+        popupMessage: {
+          type: {
+            type: String,
+            enum: ["none", "default", "custom"],
+            default: "default",
+          },
+          customText: {
+            type: String,
+            trim: true,
+          },
+        },
+        pageText: {
+          type: {
+            type: String,
+            enum: ["none", "book_description", "custom"],
+            default: "book_description",
+          },
+          customText: {
+            type: String,
+            trim: true,
+          },
+        },
+      },
+      deliveryPageSettings: {
+        title: {
+          type: String,
+          trim: true,
+        },
+        message: {
+          type: String,
+          trim: true,
+        },
+        downloadButtonText: {
+          type: String,
+          trim: true,
+        },
+        showDownloadCount: {
+          type: Boolean,
+          default: false,
+        },
+      },
+      advancedSettings: {
+        allowBookmarking: {
+          type: Boolean,
+          default: false,
+        },
+        customRestrictionMessage: {
+          type: String,
+          trim: true,
+        },
+        requireEmailVerification: {
+          type: Boolean,
+          default: false,
+        },
+      },
+    },
+
+    // Universal Book Link Settings
+    universalBookLink: {
+      linkName: {
+        type: String,
+        trim: true,
+        maxlength: [200, "Link name cannot exceed 200 characters"],
+      },
+      selectedBook: {
+        type: String,
+        // Note: Required validation is handled at the controller level based on landing page type
+      },
+      audioSample: {
+        type: String,
+        default: "no_audio",
+      },
+      displayEbookLinks: {
+        type: Boolean,
+        default: true,
+      },
+      displayAudiobookLinks: {
+        type: Boolean,
+        default: true,
+      },
+      displayPaperbackLinks: {
+        type: Boolean,
+        default: true,
+      },
+      expirationDate: {
+        type: Date,
+      },
+      landingPageSettings: {
+        pageLayout: {
+          type: String,
+          default: "WordToWallet Default",
+        },
+        include3DEffects: {
+          type: Boolean,
+          default: true,
+        },
+        pageTheme: {
+          type: String,
+          default: "WordToWallet Black & Gray",
+        },
+        accentColor: {
+          type: String,
+          default: "Default",
+        },
+        pageTitle: {
+          type: String,
+          default: "Get your FREE copy of {{title}}.",
+        },
+        buttonText: {
+          type: String,
+          default: "Get My Book",
+        },
+        heading1: {
+          type: {
+            type: String,
+            enum: ["none", "tagline", "newsletter", "get_free_copy", "custom"],
+            default: "tagline",
+          },
+          customText: {
+            type: String,
+            trim: true,
+          },
+        },
+        heading2: {
+          type: {
+            type: String,
+            enum: ["none", "tagline", "subscribers", "get_free_copy", "custom"],
+            default: "get_free_copy",
+          },
+          customText: {
+            type: String,
+            trim: true,
+          },
+        },
+        popupMessage: {
+          type: {
+            type: String,
+            enum: ["none", "default", "custom"],
+            default: "default",
+          },
+          customText: {
+            type: String,
+            trim: true,
+          },
+        },
+        pageText: {
+          type: {
+            type: String,
+            enum: ["none", "book_description", "custom"],
+            default: "book_description",
+          },
+          customText: {
+            type: String,
+            trim: true,
+          },
+        },
+      },
+      advancedSettings: {
+        trackClicks: {
+          type: Boolean,
+          default: true,
+        },
+        customDomain: {
+          type: String,
+          trim: true,
+        },
+        analyticsEnabled: {
+          type: Boolean,
+          default: true,
+        },
+      },
+    },
+
     analytics: {
       totalViews: {
         type: Number,
@@ -302,15 +591,34 @@ const landingPageSchema = new Schema<ILandingPage>(
 // Indexes for better query performance
 landingPageSchema.index({ userId: 1 });
 landingPageSchema.index({ bookId: 1 });
+landingPageSchema.index({ type: 1 });
 landingPageSchema.index({ slug: 1 }, { unique: true });
 landingPageSchema.index({ isActive: 1 });
 landingPageSchema.index({ createdAt: -1 });
+landingPageSchema.index({ userId: 1, type: 1 });
+landingPageSchema.index({ userId: 1, bookId: 1 });
 
 // Virtual for full URL
 landingPageSchema.virtual("url").get(function () {
   return `${
-    process.env.FRONTEND_URL || "http://localhost:3000"
-  }/landing/${this.slug}`;
+    process.env.READER_FRONTEND_URL || "http://localhost:3000"
+  }/landing/${this.id}`;
+});
+
+// Virtual for page title based on type
+landingPageSchema.virtual("title").get(function () {
+  switch (this.type) {
+    case "simple_download":
+      return this.downloadPage?.pageName || "Download Page";
+    case "email_signup":
+      return this.emailSignupPage?.pageName || "Email Signup Page";
+    case "restricted":
+      return this.restrictedPage?.pageName || "Restricted Page";
+    case "universal_link":
+      return this.universalBookLink?.linkName || "Universal Book Link";
+    default:
+      return "Landing Page";
+  }
 });
 
 export const LandingPage = mongoose.model<ILandingPage>(

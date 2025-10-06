@@ -127,12 +127,12 @@ app.use(
   })
 );
 
+// Raw body parsing for Stripe webhooks - MUST be before express.json()
+app.use("/api/webhooks/stripe", express.raw({ type: "application/json" }));
+
 // Body parsing middleware
 app.use(express.json({ limit: "100mb" }));
 app.use(express.urlencoded({ extended: true, limit: "100mb" }));
-
-// Raw body parsing for Stripe webhooks
-app.use("/api/webhooks/stripe", express.raw({ type: "application/json" }));
 
 // Logging middleware
 if (process.env.NODE_ENV === "development") {

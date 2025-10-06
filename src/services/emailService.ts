@@ -251,6 +251,39 @@ export class EmailService {
   }
 
   /**
+   * Generic method to send any email
+   */
+  static async sendEmail(options: {
+    to: string;
+    subject: string;
+    text?: string;
+    html: string;
+    from?: string;
+    replyTo?: string;
+  }) {
+    try {
+      const data = {
+        from: options.from || `Word2Wallet <${FROM_EMAIL}>`,
+        to: [options.to],
+        subject: options.subject,
+        text: options.text || this.generateTextVersion(options.html),
+        html: options.html,
+        "h:Reply-To": options.replyTo || "support@word2wallet.com",
+        "h:X-Mailgun-Track": "yes",
+        "h:X-Mailgun-Track-Clicks": "yes",
+        "h:X-Mailgun-Track-Opens": "yes",
+      };
+
+      const response = await this.sendEmailViaHTTP(data);
+      console.log("Email sent successfully:", response);
+      return response;
+    } catch (error) {
+      console.error("Failed to send email:", error);
+      throw error;
+    }
+  }
+
+  /**
    * Send welcome email for new users
    */
   static async sendWelcomeEmail(user: IUser) {

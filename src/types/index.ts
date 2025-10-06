@@ -495,70 +495,8 @@ export interface IDeliveryLink extends Document {
   url: string;
 }
 
-// Landing Page Types
-export interface ILandingPage extends Document {
-  _id: string;
-  bookId: string;
-  userId: string;
-  title: string;
-  description?: string;
-  slug: string;
-  isActive: boolean;
-  design: {
-    theme: "default" | "minimal" | "modern" | "classic";
-    primaryColor: string;
-    backgroundColor: string;
-    textColor: string;
-    fontFamily: string;
-    customCSS?: string;
-  };
-  content: {
-    heroTitle: string;
-    heroSubtitle?: string;
-    heroImage?: string;
-    features?: string[];
-    testimonials?: Array<{
-      name: string;
-      text: string;
-      avatar?: string;
-    }>;
-    callToAction: {
-      text: string;
-      buttonText: string;
-      buttonColor: string;
-    };
-    aboutAuthor?: {
-      name: string;
-      bio: string;
-      avatar?: string;
-      socialLinks?: {
-        twitter?: string;
-        facebook?: string;
-        instagram?: string;
-        website?: string;
-      };
-    };
-    faq?: Array<{
-      question: string;
-      answer: string;
-    }>;
-  };
-  seo: {
-    metaTitle?: string;
-    metaDescription?: string;
-    metaKeywords?: string[];
-    ogImage?: string;
-  };
-  analytics: {
-    totalViews: number;
-    totalConversions: number;
-    uniqueVisitors: number;
-    lastAccessed?: Date;
-  };
-  createdAt: Date;
-  updatedAt: Date;
-  url: string;
-}
+// Landing Page Types - Export from landingPage.ts
+export * from "./landingPage";
 
 // Analytics Types
 export interface IBookAnalytics extends Document {
@@ -659,7 +597,7 @@ export interface IIntegration extends Document {
 }
 
 export enum IntegrationProvider {
-  BOOKFUNNEL = "bookfunnel",
+  WordToWallet = "WordToWallet",
   AMAZON_KDP = "amazon_kdp",
   DRAFT2DIGITAL = "draft2digital",
   SMASHWORDS = "smashwords",
