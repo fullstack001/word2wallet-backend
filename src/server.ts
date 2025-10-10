@@ -38,6 +38,7 @@ import emailCaptureRoutes from "./routes/emailCaptureRoutes";
 // Email marketing and payment gateway routes
 import emailMarketingRoutes from "./routes/emailMarketingRoutes";
 import paymentGatewayRoutes from "./routes/paymentGatewayRoutes";
+import newsletterRoutes from "./routes/newsletterRoutes";
 import { setWebSocketManager } from "./controllers/auctionController";
 
 // Load environment variables
@@ -197,6 +198,7 @@ app.use("/api/email-captures", emailCaptureRoutes);
 // Email marketing and payment gateway routes
 app.use("/api/email-marketing", emailMarketingRoutes);
 app.use("/api/payment-gateway", paymentGatewayRoutes);
+app.use("/api/newsletters", newsletterRoutes);
 
 // Error handling middleware
 app.use(notFound);

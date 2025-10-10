@@ -509,6 +509,7 @@ export class LandingPageController {
         firstName,
         lastName,
         conversionType = "download",
+        subscribedToNewsletter = false,
       } = req.body;
 
       const landingPage = await LandingPage.findOne({
@@ -558,6 +559,7 @@ export class LandingPageController {
               lastName,
               source: `landing_page_${landingPage._id}`,
               isConfirmed: !needsConfirmation, // Auto-confirm if not needed
+              subscribedToNewsletter, // User's newsletter opt-in choice
               metadata: {
                 ipAddress: req.ip,
                 userAgent: req.get("User-Agent"),

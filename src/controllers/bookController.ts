@@ -16,6 +16,7 @@ import {
 import { Book } from "../models/Book";
 import { EpubService } from "../services/epubService";
 import { getStorageService } from "../services/storageService";
+import { AutoNewsletterService } from "../services/autoNewsletterService";
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -383,6 +384,19 @@ export class BookController {
           console.error("Failed to delete temp file:", error);
         }
       }
+
+      // 📧 AUTOMATIC NEWSLETTER: Send notification to author's readers
+      // This runs in the background without blocking the response
+      AutoNewsletterService.sendNewBookNotification(userId, book._id)
+        .then((result) => {
+          console.log(
+            `✅ New book newsletter sent: ${result.sentCount} successful, ${result.failedCount} failed`
+          );
+        })
+        .catch((error) => {
+          console.error("❌ Failed to send new book newsletter:", error);
+          // Don't throw error - newsletter failure shouldn't block book creation
+        });
 
       res.status(201).json({
         success: true,

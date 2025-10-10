@@ -25,6 +25,41 @@ router.get(
   EmailCaptureController.getEmailCaptures
 );
 
+// Export email captures (must come before /:id)
+router.get(
+  "/export",
+  exportEmailCapturesValidation,
+  EmailCaptureController.exportEmailCaptures
+);
+
+// Get email capture statistics (must come before /:id)
+router.get(
+  "/stats",
+  getEmailCaptureStatsValidation,
+  EmailCaptureController.getEmailCaptureStats
+);
+
+// Bulk update email captures (must come before /:id)
+router.put(
+  "/bulk/update",
+  bulkUpdateEmailCapturesValidation,
+  EmailCaptureController.bulkUpdateEmailCaptures
+);
+
+// Add tags to email captures (must come before /:id)
+router.put(
+  "/bulk/tags/add",
+  addTagsToEmailCapturesValidation,
+  EmailCaptureController.addTagsToEmailCaptures
+);
+
+// Remove tags from email captures (must come before /:id)
+router.put(
+  "/bulk/tags/remove",
+  removeTagsFromEmailCapturesValidation,
+  EmailCaptureController.removeTagsFromEmailCaptures
+);
+
 // Get email capture by ID
 router.get(
   "/:id",
@@ -46,40 +81,4 @@ router.delete(
   EmailCaptureController.deleteEmailCapture
 );
 
-// Bulk update email captures
-router.put(
-  "/bulk/update",
-  bulkUpdateEmailCapturesValidation,
-  EmailCaptureController.bulkUpdateEmailCaptures
-);
-
-// Export email captures
-router.get(
-  "/export",
-  exportEmailCapturesValidation,
-  EmailCaptureController.exportEmailCaptures
-);
-
-// Get email capture statistics
-router.get(
-  "/stats",
-  getEmailCaptureStatsValidation,
-  EmailCaptureController.getEmailCaptureStats
-);
-
-// Add tags to email captures
-router.put(
-  "/bulk/tags/add",
-  addTagsToEmailCapturesValidation,
-  EmailCaptureController.addTagsToEmailCaptures
-);
-
-// Remove tags from email captures
-router.put(
-  "/bulk/tags/remove",
-  removeTagsFromEmailCapturesValidation,
-  EmailCaptureController.removeTagsFromEmailCaptures
-);
-
 export default router;
-

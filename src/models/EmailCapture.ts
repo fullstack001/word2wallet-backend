@@ -16,6 +16,7 @@ export interface IEmailCapture {
   confirmationToken?: string; // Token for email confirmation
   confirmationTokenExpiry?: Date; // Expiry date for confirmation token
   confirmedAt?: Date; // When the email was confirmed
+  subscribedToNewsletter: boolean; // Whether user opted-in to newsletter
   metadata: {
     ipAddress?: string;
     userAgent?: string;
@@ -99,6 +100,10 @@ const emailCaptureSchema = new Schema<IEmailCapture>(
     },
     confirmedAt: {
       type: Date,
+    },
+    subscribedToNewsletter: {
+      type: Boolean,
+      default: false,
     },
     metadata: {
       ipAddress: {
