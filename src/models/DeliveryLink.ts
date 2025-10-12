@@ -16,6 +16,16 @@ export interface IDeliveryLink {
     expiryDate?: Date;
     password?: string; // Optional password protection
   };
+  // Sale settings
+  saleSettings?: {
+    enabled: boolean; // Whether this is a sale link
+    price?: number; // Book price
+    currency?: string; // Currency code (USD, EUR, etc.)
+    salePageTitle?: string; // Custom title for sale page
+    salePageDescription?: string; // Custom description for sale page
+    paypalLink?: string; // User's PayPal buy link
+    stripeLink?: string; // User's Stripe payment link
+  };
   analytics: {
     totalViews: number;
     totalDownloads: number;
@@ -84,6 +94,45 @@ const deliveryLinkSchema = new Schema<IDeliveryLink>(
       password: {
         type: String,
         trim: true,
+      },
+    },
+    saleSettings: {
+      enabled: {
+        type: Boolean,
+        default: false,
+      },
+      price: {
+        type: Number,
+        min: [0, "Price cannot be negative"],
+      },
+      currency: {
+        type: String,
+        default: "USD",
+        uppercase: true,
+        trim: true,
+      },
+      salePageTitle: {
+        type: String,
+        trim: true,
+        maxlength: [200, "Sale page title cannot exceed 200 characters"],
+      },
+      salePageDescription: {
+        type: String,
+        trim: true,
+        maxlength: [
+          2000,
+          "Sale page description cannot exceed 2000 characters",
+        ],
+      },
+      paypalLink: {
+        type: String,
+        trim: true,
+        maxlength: [500, "PayPal link cannot exceed 500 characters"],
+      },
+      stripeLink: {
+        type: String,
+        trim: true,
+        maxlength: [500, "Stripe link cannot exceed 500 characters"],
       },
     },
     analytics: {

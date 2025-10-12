@@ -33,7 +33,7 @@ export class DeliveryLinkController {
       }
 
       const userId = req.user!._id;
-      const { bookId, title, description, settings } = req.body;
+      const { bookId, title, description, settings, saleSettings } = req.body;
 
       // Verify book exists and belongs to user
       const book = await Book.findOne({ _id: bookId, userId });
@@ -66,7 +66,7 @@ export class DeliveryLinkController {
         description,
         slug,
         settings: {
-          requireEmail: settings?.requireEmail || false,
+          requireEmail: true, // Always require email for all links
           allowAnonymous: settings?.allowAnonymous !== false,
           maxDownloads: settings?.maxDownloads,
           expiryDate: settings?.expiryDate
@@ -74,9 +74,28 @@ export class DeliveryLinkController {
             : undefined,
           password: settings?.password,
         },
+        saleSettings: saleSettings
+          ? {
+              enabled: saleSettings.enabled || false,
+              price: saleSettings.price,
+              currency: saleSettings.currency || "USD",
+              salePageTitle: saleSettings.salePageTitle,
+              salePageDescription: saleSettings.salePageDescription,
+              paypalLink: saleSettings.paypalLink,
+              stripeLink: saleSettings.stripeLink,
+            }
+          : undefined,
       });
 
+      console.log(
+        "Creating delivery link with saleSettings:",
+        deliveryLink.saleSettings
+      );
       await deliveryLink.save();
+      console.log(
+        "Delivery link saved with saleSettings:",
+        deliveryLink.saleSettings
+      );
 
       res.status(201).json({
         success: true,
@@ -348,6 +367,46 @@ export class DeliveryLinkController {
   }
 
   /**
+   * Get delivery link by slug (public - for displaying sale page)
+   */
+  static async getDeliveryLinkBySlug(
+    req: Request,
+    res: Response
+  ): Promise<void> {
+    try {
+      const { slug } = req.params;
+
+      const deliveryLink = await DeliveryLink.findOne({
+        slug,
+        isActive: true,
+      }).populate("bookId");
+
+      if (!deliveryLink) {
+        res.status(404).json({
+          success: false,
+          message: "Delivery link not found or inactive",
+        } as ApiResponse);
+        return;
+      }
+
+      // Return the delivery link data (public info only)
+      res.json({
+        success: true,
+        message: "Delivery link found",
+        data: deliveryLink as any,
+        deliveryLink: deliveryLink as any, // For backward compatibility
+      } as ApiResponse);
+    } catch (error) {
+      console.error("Get delivery link by slug error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch delivery link",
+        error: error instanceof Error ? error.message : "Unknown error",
+      } as ApiResponse);
+    }
+  }
+
+  /**
    * Public endpoint to access a delivery link
    */
   static async accessDeliveryLink(req: Request, res: Response): Promise<void> {
@@ -604,4 +663,3 @@ export class DeliveryLinkController {
     }
   }
 }
-

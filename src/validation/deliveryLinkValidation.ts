@@ -1,5 +1,23 @@
 import { body, param, query } from "express-validator";
 
+// Custom validator to check if at least one payment link is provided
+const atLeastOnePaymentLink = (value: any, { req }: any) => {
+  const saleSettings = req.body.saleSettings;
+  if (saleSettings && saleSettings.enabled) {
+    const hasPaypal =
+      saleSettings.paypalLink && saleSettings.paypalLink.trim().length > 0;
+    const hasStripe =
+      saleSettings.stripeLink && saleSettings.stripeLink.trim().length > 0;
+
+    if (!hasPaypal && !hasStripe) {
+      throw new Error(
+        "At least one payment link (PayPal or Stripe) is required for sale links"
+      );
+    }
+  }
+  return true;
+};
+
 export const createDeliveryLinkValidation = [
   body("bookId")
     .notEmpty()
@@ -50,6 +68,55 @@ export const createDeliveryLinkValidation = [
     .isLength({ min: 1, max: 100 })
     .withMessage("Password must be between 1 and 100 characters")
     .trim(),
+
+  // Sale settings validation
+  body("saleSettings")
+    .optional()
+    .isObject()
+    .withMessage("Sale settings must be an object"),
+
+  body("saleSettings.enabled")
+    .optional()
+    .isBoolean()
+    .withMessage("Sale enabled must be a boolean"),
+
+  body("saleSettings.price")
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage("Price must be a positive number"),
+
+  body("saleSettings.currency")
+    .optional()
+    .isLength({ min: 3, max: 3 })
+    .withMessage("Currency must be a 3-letter code")
+    .trim(),
+
+  body("saleSettings.salePageTitle")
+    .optional()
+    .isLength({ max: 200 })
+    .withMessage("Sale page title cannot exceed 200 characters")
+    .trim(),
+
+  body("saleSettings.salePageDescription")
+    .optional()
+    .isLength({ max: 2000 })
+    .withMessage("Sale page description cannot exceed 2000 characters")
+    .trim(),
+
+  body("saleSettings.paypalLink")
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage("PayPal link cannot exceed 500 characters")
+    .trim(),
+
+  body("saleSettings.stripeLink")
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage("Stripe link cannot exceed 500 characters")
+    .trim(),
+
+  // Custom validation: at least one payment link required
+  body("saleSettings").optional().custom(atLeastOnePaymentLink),
 ];
 
 export const updateDeliveryLinkValidation = [
@@ -102,6 +169,55 @@ export const updateDeliveryLinkValidation = [
     .isLength({ min: 1, max: 100 })
     .withMessage("Password must be between 1 and 100 characters")
     .trim(),
+
+  // Sale settings validation
+  body("saleSettings")
+    .optional()
+    .isObject()
+    .withMessage("Sale settings must be an object"),
+
+  body("saleSettings.enabled")
+    .optional()
+    .isBoolean()
+    .withMessage("Sale enabled must be a boolean"),
+
+  body("saleSettings.price")
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage("Price must be a positive number"),
+
+  body("saleSettings.currency")
+    .optional()
+    .isLength({ min: 3, max: 3 })
+    .withMessage("Currency must be a 3-letter code")
+    .trim(),
+
+  body("saleSettings.salePageTitle")
+    .optional()
+    .isLength({ max: 200 })
+    .withMessage("Sale page title cannot exceed 200 characters")
+    .trim(),
+
+  body("saleSettings.salePageDescription")
+    .optional()
+    .isLength({ max: 2000 })
+    .withMessage("Sale page description cannot exceed 2000 characters")
+    .trim(),
+
+  body("saleSettings.paypalLink")
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage("PayPal link cannot exceed 500 characters")
+    .trim(),
+
+  body("saleSettings.stripeLink")
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage("Stripe link cannot exceed 500 characters")
+    .trim(),
+
+  // Custom validation: at least one payment link required
+  body("saleSettings").optional().custom(atLeastOnePaymentLink),
 ];
 
 export const getDeliveryLinkValidation = [
@@ -144,4 +260,3 @@ export const getDeliveryLinkAnalyticsValidation = [
     .isISO8601()
     .withMessage("End date must be a valid date"),
 ];
-

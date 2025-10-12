@@ -12,7 +12,20 @@ import {
 
 const router = Router();
 
-// All routes require authentication
+// Public routes (no auth required) - must be before auth middleware
+// Get delivery link by slug (for displaying sale page)
+router.get("/slug/:slug", DeliveryLinkController.getDeliveryLinkBySlug);
+
+// Access delivery link by slug
+router.post("/public/:slug", DeliveryLinkController.accessDeliveryLink);
+
+// Download from delivery link
+router.get(
+  "/public/:slug/download",
+  DeliveryLinkController.downloadFromDeliveryLink
+);
+
+// All routes below require authentication
 router.use(auth);
 
 // Create delivery link
@@ -57,15 +70,4 @@ router.get(
   DeliveryLinkController.getDeliveryLinkAnalytics
 );
 
-// Public routes (no auth required)
-// Access delivery link by slug
-router.post("/public/:slug", DeliveryLinkController.accessDeliveryLink);
-
-// Download from delivery link
-router.get(
-  "/public/:slug/download",
-  DeliveryLinkController.downloadFromDeliveryLink
-);
-
 export default router;
-
