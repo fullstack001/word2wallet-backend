@@ -179,7 +179,7 @@ deliveryLinkSchema.index({ createdAt: -1 });
 deliveryLinkSchema.virtual("url").get(function () {
   return `${
     process.env.FRONTEND_URL || "http://localhost:3000"
-  }/book/${this.slug}`;
+  }/en/book/${this.slug}`;
 });
 
 export const DeliveryLink = mongoose.model<IDeliveryLink>(
