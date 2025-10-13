@@ -145,7 +145,7 @@ const bookSchema = new Schema<IBook>(
     description: {
       type: String,
       trim: true,
-      maxlength: [2000, "Description cannot exceed 2000 characters"],
+      maxlength: [20000, "Description cannot exceed 2000 characters"],
     },
     isbn: {
       type: String,
@@ -208,7 +208,7 @@ const bookSchema = new Schema<IBook>(
     notesToReaders: {
       type: String,
       trim: true,
-      maxlength: [2000, "Notes to readers cannot exceed 2000 characters"],
+      maxlength: [20000, "Notes to readers cannot exceed 20000   characters"],
     },
     bookType: {
       type: String,
