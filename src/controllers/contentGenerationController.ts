@@ -199,7 +199,11 @@ export class ContentGenerationController {
       );
       return;
     }
-    ContentGenerationController.openai = new OpenAI({ apiKey });
+    ContentGenerationController.openai = new OpenAI({
+      apiKey,
+      timeout: 600000, // 10 minutes (600 seconds) - increased from default 10 minutes for long content
+      maxRetries: 2,
+    });
     console.log(
       `✅ OpenAI client initialized successfully (model: ${ContentGenerationController.defaultModel})`
     );
@@ -361,7 +365,7 @@ Build content using ONLY the allowed blocks and rules above.
           model,
           messages,
           temperature: 0.2,
-          max_completion_tokens: 4000,
+          max_completion_tokens: 100000, // Increased from 40000 for longer content generation
         });
 
       const raw = completion.choices[0]?.message?.content ?? "";

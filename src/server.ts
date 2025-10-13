@@ -233,6 +233,13 @@ const startServer = async () => {
       console.log(`🔌 WebSocket server: ws://localhost:${PORT}/ws`);
       console.log(`🏆 Auction system: Active with real data integration`);
     });
+
+    // Increase server timeout for long-running operations like AI content generation
+    server.timeout = 600000; // 10 minutes (600 seconds)
+    server.keepAliveTimeout = 610000; // Slightly higher than timeout
+    console.log(
+      `⏱️  Server timeout set to 10 minutes for long content generation`
+    );
   } catch (error) {
     console.error("❌ Failed to start server:", error);
     process.exit(1);
