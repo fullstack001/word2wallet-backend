@@ -45,7 +45,11 @@ router.get(
 );
 
 // Create book draft (without file upload)
-router.post("/draft", uploadBookValidation, BookController.createDraft);
+router.post(
+  "/draft",
+  // uploadBookValidation,
+  BookController.createDraft
+);
 
 // Upload cover image for draft book
 router.post(
