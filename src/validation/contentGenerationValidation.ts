@@ -43,8 +43,8 @@ export const generateContentValidation: ValidationChain[] = [
   body("instructions")
     .optional()
     .trim()
-    .isLength({ max: 5000 })
-    .withMessage("Instructions must be less than 5000 characters"),
+    .isLength({ max: 50000 })
+    .withMessage("Instructions must be less than 50000 characters"),
 
   body("courseTitle")
     .optional()
