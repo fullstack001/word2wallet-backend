@@ -58,7 +58,7 @@ const sanitizePassthrough = (html: string) =>
 const BlockSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("heading"),
-    level: z.literal(2),
+    level: z.union([z.literal(2), z.literal(3), z.literal(4)]), // Allow H2, H3, H4
     text: z.string().min(1),
   }),
   z.object({
@@ -93,7 +93,7 @@ const BlockSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("button"),
     text: z.string().min(1),
-    href: z.string().url(),
+    href: z.string().min(1), // Allow any non-empty string (URLs or placeholders like {{VAR}})
   }),
 ]);
 
@@ -135,7 +135,7 @@ const renderStrictBlocksToHTML = (
     .map((b) => {
       switch (b.type) {
         case "heading":
-          return `<h2>${esc(b.text)}</h2>`;
+          return `<h${b.level}>${esc(b.text)}</h${b.level}>`;
         case "paragraph":
           return `<p>${esc(b.text)}</p>`;
         case "image": {
@@ -311,13 +311,13 @@ MODES:
 No templates. No meta. No style. No extra sections. No wrappers.
 
 ALLOWED BLOCKS (deterministic mapping only):
-- Heading -> { "type":"heading","level":2,"text":string }
+- Heading -> { "type":"heading","level":2|3|4,"text":string } (H2, H3, or H4)
 - Paragraph -> { "type":"paragraph","text":string }
 - Image BLOCK -> { "type":"image","url":https URL, "alt":string, "width"?:int, "height"?:int }
 - Video BLOCK -> { "type":"video","url":https MP4 URL, "width"?:int, "height"?:int, "aspect"?: "W:H" }
 - Audio BLOCK -> { "type":"audio","url":https MP3 URL }
 - List -> { "type":"list","items":[string, ...] }
-- Button -> { "type":"button","text":string,"href":https URL }
+- Button -> { "type":"button","text":string,"href":URL or {{placeholder}} }
 
 EXTERNAL MEDIA:
 - Accept HTTPS remote URLs only.
