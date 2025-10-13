@@ -39,6 +39,7 @@ import emailCaptureRoutes from "./routes/emailCaptureRoutes";
 import emailMarketingRoutes from "./routes/emailMarketingRoutes";
 import paymentGatewayRoutes from "./routes/paymentGatewayRoutes";
 import newsletterRoutes from "./routes/newsletterRoutes";
+import paymentTransactionRoutes from "./routes/paymentTransactionRoutes";
 // Write book routes
 import writeBookRoutes from "./routes/writeBook";
 import { setWebSocketManager } from "./controllers/auctionController";
@@ -201,6 +202,7 @@ app.use("/api/email-captures", emailCaptureRoutes);
 app.use("/api/email-marketing", emailMarketingRoutes);
 app.use("/api/payment-gateway", paymentGatewayRoutes);
 app.use("/api/newsletters", newsletterRoutes);
+app.use("/api/payment-transactions", paymentTransactionRoutes);
 // Write book routes
 app.use("/api/write-book", writeBookRoutes);
 

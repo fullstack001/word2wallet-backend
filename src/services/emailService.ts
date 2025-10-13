@@ -411,4 +411,129 @@ export class EmailService {
       throw error;
     }
   }
+
+  /**
+   * Send purchase confirmation email with download link
+   */
+  static async sendPurchaseConfirmation(
+    email: string,
+    customerName: string,
+    bookTitle: string,
+    downloadLink: string,
+    expiresAt: Date
+  ) {
+    try {
+      const expiryDate = expiresAt.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+
+      const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+    .button { display: inline-block; background: #667eea; color: white !important; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold; }
+    .info-box { background: white; padding: 20px; border-left: 4px solid #667eea; margin: 20px 0; }
+    .footer { text-align: center; color: #999; font-size: 12px; margin-top: 30px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🎉 Thank You for Your Purchase!</h1>
+    </div>
+    <div class="content">
+      <p>Hi ${customerName},</p>
+      <p>Thank you for purchasing <strong>${bookTitle}</strong>! Your book is ready to download.</p>
+      
+      <div class="info-box">
+        <p><strong>📚 Book:</strong> ${bookTitle}</p>
+        <p><strong>📧 Email:</strong> ${email}</p>
+        <p><strong>⏰ Access Expires:</strong> ${expiryDate}</p>
+        <p><strong>💾 Downloads:</strong> 3 downloads available</p>
+      </div>
+
+      <p style="text-align: center;">
+        <a href="${downloadLink}" class="button">Download Your Book Now</a>
+      </p>
+
+      <p style="font-size: 14px; color: #666;">
+        Your download link is valid until <strong>${expiryDate}</strong> and can be used up to 3 times. 
+        Please save this email for future reference.
+      </p>
+
+      <p style="font-size: 14px; color: #666;">
+        If the button doesn't work, copy and paste this link into your browser:<br>
+        <a href="${downloadLink}" style="color: #667eea; word-break: break-all;">${downloadLink}</a>
+      </p>
+
+      <hr style="border: 1px solid #eee; margin: 30px 0;">
+
+      <p><strong>Need Help?</strong></p>
+      <p>If you have any questions or issues with your download, please reply to this email and we'll be happy to assist you.</p>
+
+      <p>Enjoy your reading!</p>
+    </div>
+    <div class="footer">
+      <p>This email was sent to ${email}</p>
+      <p>© ${new Date().getFullYear()} Word2Wallet. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
+      `;
+
+      const textContent = `
+Thank You for Your Purchase!
+
+Hi ${customerName},
+
+Thank you for purchasing ${bookTitle}! Your book is ready to download.
+
+Book: ${bookTitle}
+Email: ${email}
+Access Expires: ${expiryDate}
+Downloads: 3 downloads available
+
+Download your book here: ${downloadLink}
+
+Your download link is valid until ${expiryDate} and can be used up to 3 times. 
+Please save this email for future reference.
+
+Need Help?
+If you have any questions or issues with your download, please reply to this email and we'll be happy to assist you.
+
+Enjoy your reading!
+
+---
+This email was sent to ${email}
+© ${new Date().getFullYear()} Word2Wallet. All rights reserved.
+      `;
+
+      const data = {
+        from: `Word2Wallet <${FROM_EMAIL}>`,
+        to: [email],
+        subject: `Your Book is Ready: ${bookTitle}`,
+        text: textContent,
+        html: htmlContent,
+        "h:Reply-To": "support@word2wallet.com",
+        "h:X-Mailgun-Track": "yes",
+        "h:X-Mailgun-Track-Clicks": "yes",
+        "h:X-Mailgun-Track-Opens": "yes",
+      };
+
+      const response = await this.sendEmailViaHTTP(data);
+      console.log("Purchase confirmation email sent:", response);
+      return response;
+    } catch (error) {
+      console.error("Failed to send purchase confirmation email:", error);
+      throw error;
+    }
+  }
 }
