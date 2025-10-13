@@ -120,8 +120,8 @@ const deliveryLinkSchema = new Schema<IDeliveryLink>(
         type: String,
         trim: true,
         maxlength: [
-          2000,
-          "Sale page description cannot exceed 2000 characters",
+          20000,
+          "Sale page description cannot exceed 20000 characters",
         ],
       },
       paypalLink: {

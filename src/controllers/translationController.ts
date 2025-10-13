@@ -93,7 +93,7 @@ export class TranslationController {
               },
             ],
             temperature: 0.3,
-            max_completion_tokens: 2000,
+            max_completion_tokens: 20000,
           },
           {
             timeout: 60000, // 600 seconds timeout
