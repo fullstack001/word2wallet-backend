@@ -12,7 +12,6 @@ ContentGenerationController.initialize();
 router.post(
   "/generate-chapter-content",
   authenticate,
-  requireAdmin,
   generateContentValidation,
   ContentGenerationController.generateChapterContent
 );
