@@ -99,7 +99,7 @@ export const createDeliveryLinkValidation = [
 
   body("saleSettings.salePageDescription")
     .optional()
-    .isLength({ max: 20000 })
+    .isLength({ max: 2000000 })
     .withMessage("Sale page description cannot exceed 2000 characters")
     .trim(),
 
@@ -200,7 +200,7 @@ export const updateDeliveryLinkValidation = [
 
   body("saleSettings.salePageDescription")
     .optional()
-    .isLength({ max: 20000 })
+    .isLength({ max: 2000000 })
     .withMessage("Sale page description cannot exceed 2000 characters")
     .trim(),
 

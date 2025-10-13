@@ -17,8 +17,8 @@ export const uploadBookValidation = [
 
   body("description")
     .optional()
-    .isLength({ max: 20000 })
-    .withMessage("Description cannot exceed 20000 characters")
+    .isLength({ max: 2000000 })
+    .withMessage("Description cannot exceed 2000000 characters")
     .trim(),
 
   body("isbn")
@@ -76,8 +76,8 @@ export const uploadBookValidation = [
 
   body("notesToReaders")
     .optional()
-    .isLength({ max: 20000 })
-    .withMessage("Notes to readers cannot exceed 20000 characters")
+    .isLength({ max: 2000000 })
+    .withMessage("Notes to readers cannot exceed 2000000 characters")
     .trim(),
 
   body("bookType")
@@ -125,8 +125,8 @@ export const updateBookValidation = [
 
   body("description")
     .optional()
-    .isLength({ max: 20000 })
-    .withMessage("Description cannot exceed 20000 characters")
+    .isLength({ max: 2000000 })
+    .withMessage("Description cannot exceed 2000000 characters")
     .trim(),
 
   body("isbn")
@@ -196,8 +196,8 @@ export const updateBookValidation = [
 
   body("notesToReaders")
     .optional()
-    .isLength({ max: 20000 })
-    .withMessage("Notes to readers cannot exceed 20000 characters")
+    .isLength({ max: 2000000 })
+    .withMessage("Notes to readers cannot exceed 2000000 characters")
     .trim(),
 
   body("bookType")

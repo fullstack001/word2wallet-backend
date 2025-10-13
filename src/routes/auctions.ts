@@ -43,7 +43,7 @@ const auctionValidation = [
     .withMessage("Title must be between 1 and 200 characters"),
   body("description")
     .trim()
-    .isLength({ min: 1, max: 20000 })
+    .isLength({ min: 1, max: 2000000 })
     .withMessage("Description must be between 1 and 2000 characters"),
   body("startingPrice")
     .isNumeric()
