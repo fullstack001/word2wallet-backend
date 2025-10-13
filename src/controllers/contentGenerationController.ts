@@ -365,7 +365,7 @@ Build content using ONLY the allowed blocks and rules above.
           model,
           messages,
           temperature: 0.2,
-          max_completion_tokens: 100000, // Increased from 40000 for longer content generation
+          max_completion_tokens: 4000, // Increased from 40000 for longer content generation
         });
 
       const raw = completion.choices[0]?.message?.content ?? "";
