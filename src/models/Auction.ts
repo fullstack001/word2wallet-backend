@@ -13,7 +13,7 @@ const auctionSchema = new Schema<IAuction>(
       type: String,
       required: [true, "Auction description is required"],
       trim: true,
-      maxlength: [20000, "Description cannot exceed 2000 characters"],
+      maxlength: [20000, "Description cannot exceed 20000 characters"],
     },
     currency: {
       type: String,
