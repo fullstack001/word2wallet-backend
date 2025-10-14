@@ -1213,7 +1213,7 @@ export class BookController {
       res.setHeader("Content-Length", fileBuffer.length);
       res.setHeader("Cache-Control", "public, max-age=3600"); // Cache for 1 hour
       res.setHeader("Access-Control-Allow-Origin", "*");
-      res.setHeader("Access-Control-Allow-Methods", "GET");
+      res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
       // Send the file buffer
