@@ -510,4 +510,408 @@ Build content using ONLY the allowed blocks and rules above.
       });
     }
   }
+
+  /**
+   * Custom GPT Instructions for EPUB Prompt Architect
+   */
+  private static readonly CUSTOM_GPT_INSTRUCTIONS = `You are the EPUB Prompt Architect, a specialized GPT that helps users of WordToWallet.com's EPUB3 editor craft high-quality, structured prompts to generate content using either Strict Native Blocks (no templates) or Raw HTML passthrough. These prompts are designed for generating EPUB3 promotional or educational materials through the in-platform generator. You ensure compatibility with strict generation modes and emphasize clarity, content order, and media/text block use.
+
+All code samples are always wrapped in pagination-safe, adjustable containers using: <div class="codebox"><textarea class="codearea" readonly>...</textarea></div>. These code samples use compact, resizable textarea boxes with drag handles.
+
+The GPT also suggests—but does not enforce—optional EPUB-compliant style rules users may adopt, including:
+- System font stack for legibility
+- Semantic structure (<section>, <h1>-<h3>, <ul>/<ol>, etc.)
+- .btn class for styled buttons
+- Break avoidance for lists/images/tables
+- Light color scheme
+- Accessible markup (alt text, heading order)
+
+These options are included if relevant but are not locked in. Only the adjustable codebox container is enforced.
+
+EPUB Quality Checklist:
+- All code samples use compact, resizable textarea boxes with drag handles
+- Void elements self-close: img, source, track, br, hr
+- No meta, style, or script in EPUB content files
+- All tags close; headings are in logical order; ampersands escape as needed
+
+✅ Validation Outputs:
+After every HTML or EPUB section, this GPT appends a checklist confirming:
+- All tags are closed
+- No disallowed tags are used
+- Void elements are self-closed
+- Heading structure is logical
+- Ampersands are escaped correctly
+
+Always provide complete, comprehensive responses without truncation or reduction. Generate full content as requested by users.`;
+
+  /**
+   * Generate a custom GPT response
+   */
+  static async generateCustomGPTResponse(
+    req: AuthRequest,
+    res: Response,
+    _next: NextFunction
+  ) {
+    try {
+      if (!ContentGenerationController.openai) {
+        return res.status(503).json({
+          success: false,
+          message: "OpenAI service is not available",
+        });
+      }
+
+      const {
+        userMessage,
+        conversationHistory = [],
+        context,
+      } = req.body as {
+        userMessage: string;
+        conversationHistory?: Array<{
+          role: "system" | "user" | "assistant";
+          content: string;
+        }>;
+        context?: {
+          chapterTitle?: string;
+          chapterDescription?: string;
+          contentType?: string;
+        };
+      };
+
+      if (!userMessage) {
+        return res.status(400).json({
+          success: false,
+          message: "User message is required",
+        });
+      }
+
+      // Build the conversation with system instructions
+      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+        {
+          role: "system",
+          content: ContentGenerationController.CUSTOM_GPT_INSTRUCTIONS,
+        },
+        ...conversationHistory,
+        {
+          role: "user",
+          content: userMessage,
+        },
+      ];
+
+      // Add context if provided
+      if (context?.chapterTitle || context?.chapterDescription) {
+        const contextMessage = `Context: Chapter Title: "${
+          context.chapterTitle || "Not specified"
+        }", Chapter Description: "${
+          context.chapterDescription || "Not specified"
+        }", Content Type: "${context.contentType || "educational"}"`;
+        messages.splice(-1, 0, {
+          role: "system",
+          content: contextMessage,
+        });
+      }
+
+      const completion =
+        await ContentGenerationController.openai.chat.completions.create({
+          model: "gpt-4",
+          messages: messages as any,
+          temperature: 0.7,
+          presence_penalty: 0.1,
+          frequency_penalty: 0.1,
+        });
+
+      const response = completion.choices[0]?.message?.content;
+      if (!response) {
+        throw new Error("No response generated from OpenAI");
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: "Response generated successfully",
+        data: {
+          content: response,
+          usage: completion.usage
+            ? {
+                prompt_tokens: completion.usage.prompt_tokens,
+                completion_tokens: completion.usage.completion_tokens,
+                total_tokens: completion.usage.total_tokens,
+              }
+            : undefined,
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error generating custom GPT response:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to generate response",
+      });
+    }
+  }
+
+  /**
+   * Generate Strict Native Blocks prompt using the custom GPT
+   */
+  static async generateStrictNativeBlocksPrompt(
+    req: AuthRequest,
+    res: Response,
+    _next: NextFunction
+  ) {
+    try {
+      if (!ContentGenerationController.openai) {
+        return res.status(503).json({
+          success: false,
+          message: "OpenAI service is not available",
+        });
+      }
+
+      const {
+        chapterTitle = "",
+        chapterDescription = "",
+        currentInstructions = "",
+        contentType = "educational",
+      } = req.body as {
+        chapterTitle?: string;
+        chapterDescription?: string;
+        currentInstructions?: string;
+        contentType?:
+          | "promotional"
+          | "educational"
+          | "tutorial"
+          | "auction"
+          | "delivery"
+          | "sales"
+          | "marketing";
+      };
+
+      const prompt = `Generate a Strict Native Blocks prompt for EPUB3 content with these specifications:
+
+Context:
+- Chapter Title: ${chapterTitle || "Untitled Chapter"}
+- Chapter Description: ${chapterDescription || "No description provided"}
+- Current Instructions: ${currentInstructions || "None"}
+- Content Type: ${contentType}
+
+Requirements:
+1. Create engaging, professional content suitable for EPUB3
+2. Use only CREATE SECTION, ADD TEXT H1, ADD PARAGRAPH commands
+3. Ensure all text is ASCII-compliant
+4. Structure content logically with clear sections
+5. Make content actionable and valuable for readers
+6. Include practical examples or insights where appropriate
+
+Generate a comprehensive prompt that will create high-quality EPUB3 content following the STRICT_NATIVE_BLOCKS EMISSION CONTRACT v1.`;
+
+      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+        {
+          role: "system",
+          content: ContentGenerationController.CUSTOM_GPT_INSTRUCTIONS,
+        },
+        {
+          role: "system",
+          content: `Context: Chapter Title: "${chapterTitle}", Chapter Description: "${chapterDescription}", Content Type: "${contentType}"`,
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ];
+
+      const completion =
+        await ContentGenerationController.openai.chat.completions.create({
+          model: "gpt-4",
+          messages: messages as any,
+          temperature: 0.7,
+          presence_penalty: 0.1,
+          frequency_penalty: 0.1,
+        });
+
+      const response = completion.choices[0]?.message?.content;
+      if (!response) {
+        throw new Error("No response generated from OpenAI");
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: "Prompt generated successfully",
+        data: {
+          content: response,
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error generating prompt:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to generate prompt",
+      });
+    }
+  }
+
+  /**
+   * Generate video tutorial script
+   */
+  static async generateVideoScript(
+    req: AuthRequest,
+    res: Response,
+    _next: NextFunction
+  ) {
+    try {
+      if (!ContentGenerationController.openai) {
+        return res.status(503).json({
+          success: false,
+          message: "OpenAI service is not available",
+        });
+      }
+
+      const {
+        title = "",
+        description = "",
+        contentType = "educational",
+      } = req.body as {
+        title?: string;
+        description?: string;
+        contentType?: string;
+      };
+
+      const prompt = `Generate a detailed video tutorial script for "${title}". 
+
+Description: ${description}
+Content Type: ${contentType}
+
+Create a professional video script with:
+1. Introduction with hook
+2. Clear step-by-step instructions
+3. Visual cues and screen recording guidance
+4. Engaging narration
+5. Call-to-action for WordToWallet.com
+
+Format the script with timing markers and visual descriptions.`;
+
+      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+        {
+          role: "system",
+          content: ContentGenerationController.CUSTOM_GPT_INSTRUCTIONS,
+        },
+        {
+          role: "system",
+          content: `Context: Chapter Title: "${title}", Chapter Description: "${description}", Content Type: "${contentType}"`,
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ];
+
+      const completion =
+        await ContentGenerationController.openai.chat.completions.create({
+          model: "gpt-4",
+          messages: messages as any,
+          temperature: 0.7,
+          presence_penalty: 0.1,
+          frequency_penalty: 0.1,
+        });
+
+      const response = completion.choices[0]?.message?.content;
+      if (!response) {
+        throw new Error("No response generated from OpenAI");
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: "Video script generated successfully",
+        data: {
+          content: response,
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error generating video script:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to generate video script",
+      });
+    }
+  }
+
+  /**
+   * Generate video storyboard
+   */
+  static async generateVideoStoryboard(
+    req: AuthRequest,
+    res: Response,
+    _next: NextFunction
+  ) {
+    try {
+      if (!ContentGenerationController.openai) {
+        return res.status(503).json({
+          success: false,
+          message: "OpenAI service is not available",
+        });
+      }
+
+      const {
+        title = "",
+        description = "",
+        contentType = "educational",
+      } = req.body as {
+        title?: string;
+        description?: string;
+        contentType?: string;
+      };
+
+      const prompt = `Create a detailed video storyboard for "${title}".
+
+Description: ${description}
+Content Type: ${contentType}
+
+Generate a professional storyboard with:
+1. Scene-by-scene breakdown
+2. Visual descriptions and timing
+3. Text overlays and graphics
+4. Action sequences and transitions
+5. Call-to-action scenes
+
+Include timing, visual elements, narration, and technical specifications.`;
+
+      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+        {
+          role: "system",
+          content: ContentGenerationController.CUSTOM_GPT_INSTRUCTIONS,
+        },
+        {
+          role: "system",
+          content: `Context: Chapter Title: "${title}", Chapter Description: "${description}", Content Type: "${contentType}"`,
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ];
+
+      const completion =
+        await ContentGenerationController.openai.chat.completions.create({
+          model: "gpt-4",
+          messages: messages as any,
+          temperature: 0.7,
+          presence_penalty: 0.1,
+          frequency_penalty: 0.1,
+        });
+
+      const response = completion.choices[0]?.message?.content;
+      if (!response) {
+        throw new Error("No response generated from OpenAI");
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: "Video storyboard generated successfully",
+        data: {
+          content: response,
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error generating video storyboard:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to generate video storyboard",
+      });
+    }
+  }
 }

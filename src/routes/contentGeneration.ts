@@ -23,4 +23,29 @@ router.get(
   ContentGenerationController.getModelsStatus
 );
 
+// Custom GPT endpoints for AI Prompt Generator
+router.post(
+  "/custom-gpt-response",
+  authenticate,
+  ContentGenerationController.generateCustomGPTResponse
+);
+
+router.post(
+  "/generate-prompt",
+  authenticate,
+  ContentGenerationController.generateStrictNativeBlocksPrompt
+);
+
+router.post(
+  "/generate-video-script",
+  authenticate,
+  ContentGenerationController.generateVideoScript
+);
+
+router.post(
+  "/generate-video-storyboard",
+  authenticate,
+  ContentGenerationController.generateVideoStoryboard
+);
+
 export default router;
