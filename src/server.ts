@@ -14,6 +14,7 @@ import { notFound } from "./middleware/notFound";
 import { createAdminUserFromEnv } from "./utils/createAdminUser";
 import WebSocketManager from "./services/websocketServer";
 import { AuctionScheduler } from "./services/auctionScheduler";
+import { CampaignScheduler } from "./services/campaignScheduler";
 // Job service removed - no longer needed for simple book operations
 
 // Import routes
@@ -42,6 +43,8 @@ import newsletterRoutes from "./routes/newsletterRoutes";
 import paymentTransactionRoutes from "./routes/paymentTransactionRoutes";
 // Write book routes
 import writeBookRoutes from "./routes/writeBook";
+// Email campaign routes
+import emailCampaignRoutes from "./routes/emailCampaignRoutes";
 import { setWebSocketManager } from "./controllers/auctionController";
 
 // Load environment variables
@@ -205,6 +208,8 @@ app.use("/api/newsletters", newsletterRoutes);
 app.use("/api/payment-transactions", paymentTransactionRoutes);
 // Write book routes
 app.use("/api/write-book", writeBookRoutes);
+// Email campaign routes
+app.use("/api/email-campaigns", emailCampaignRoutes);
 
 // Error handling middleware
 app.use(notFound);
@@ -223,6 +228,10 @@ const startServer = async () => {
     // Start auction scheduler
     console.log("⏰ Starting auction scheduler...");
     AuctionScheduler.start();
+
+    // Start campaign scheduler
+    console.log("📧 Starting campaign scheduler...");
+    CampaignScheduler.start();
 
     // Job workers removed - no longer needed
 
