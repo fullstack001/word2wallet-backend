@@ -25,12 +25,14 @@ router.get("/:filename", async (req, res): Promise<Response> => {
     // Get file metadata
     const metadata = await storageService.getFileMetadata(filename);
 
-    // Set appropriate headers
+    // Set appropriate headers with CORS
     if (metadata.contentType) {
       res.setHeader("Content-Type", metadata.contentType);
     }
     res.setHeader("Content-Length", metadata.size.toString());
     res.setHeader("Last-Modified", metadata.lastModified.toUTCString());
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cache-Control", "public, max-age=31536000");
 
     // Stream the file
     const filePath = path.join(

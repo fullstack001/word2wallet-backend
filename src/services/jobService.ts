@@ -4,7 +4,7 @@ import { IJob, JobType, JobStatus, IBook, BookStatus } from "../types";
 import { Job as JobModel } from "../models/Job";
 import { Book } from "../models/Book";
 import { EpubService } from "./epubService";
-import { getS3Service } from "./s3Service";
+import { getLocalStorageService } from "./localStorageService";
 
 // Redis connection - will be initialized after dotenv config
 let redis: IORedis;

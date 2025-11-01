@@ -320,6 +320,73 @@ export const uploadMultiple = multer({
   },
 });
 
+// Configure storage for media files (images, audio, video)
+const mediaStorage = multer.diskStorage({
+  destination: (req: Request, file, cb) => {
+    const uploadPath = process.env.UPLOAD_PATH || "./uploads";
+    const tempDir = path.join(uploadPath, "temp");
+    cb(null, tempDir);
+  },
+  filename: (req: Request, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    const filename = `media-${uniqueSuffix}${path.extname(file.originalname)}`;
+    cb(null, filename);
+  },
+});
+
+// File filter for media files (images, audio, video)
+const mediaFileFilter = (
+  req: Request,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback
+) => {
+  const allowedMimes = [
+    // Images
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+    // Audio
+    "audio/mpeg",
+    "audio/mp3",
+    "audio/wav",
+    "audio/ogg",
+    "audio/m4a",
+    "audio/aac",
+    "audio/webm",
+    // Video
+    "video/mp4",
+    "video/avi",
+    "video/mov",
+    "video/wmv",
+    "video/flv",
+    "video/webm",
+    "video/mkv",
+    "video/3gp",
+  ];
+
+  if (allowedMimes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(
+      new CustomError(
+        "Only images (JPEG, PNG, WebP, GIF), audio (MP3, WAV, OGG, M4A, AAC, WebM), and video (MP4, AVI, MOV, WMV, FLV, WebM, MKV, 3GP) files are allowed",
+        400
+      )
+    );
+  }
+};
+
+export const uploadMedia = multer({
+  storage: mediaStorage,
+  fileFilter: mediaFileFilter,
+  limits: {
+    fileSize: 100 * 1024 * 1024, // 100MB limit
+    files: 1, // Only one file at a time
+  },
+});
+
 // Error handling middleware for multer
 export const handleUploadError = (
   error: any,

@@ -404,7 +404,7 @@ export const getLocalStorageService = (): LocalStorageService => {
     const config: LocalStorageConfig = {
       uploadPath:
         process.env.UPLOAD_PATH || path.join(__dirname, "../../uploads"),
-      baseUrl: process.env.BASE_URL || "http://localhost:5000/files",
+      baseUrl: process.env.BASE_URL || "http://localhost:5000/uploads",
     };
 
     localStorageInstance = new LocalStorageService(config);

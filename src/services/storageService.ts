@@ -1,10 +1,9 @@
-import { S3Service, getS3Service } from "./s3Service";
 import {
   LocalStorageService,
   getLocalStorageService,
 } from "./localStorageService";
 
-export type StorageProvider = "s3" | "local";
+export type StorageProvider = "local";
 
 export interface StorageService {
   uploadFile(
@@ -59,33 +58,12 @@ let storageServiceInstance: StorageService | null = null;
 
 export const getStorageService = (): StorageService => {
   if (!storageServiceInstance) {
-    const provider = (process.env.STORAGE_PROVIDER ||
-      "local") as StorageProvider;
-
-    switch (provider) {
-      case "s3":
-        try {
-          storageServiceInstance = getS3Service();
-          console.log("Using S3 storage service");
-        } catch (error) {
-          console.warn(
-            "S3 configuration not found, falling back to local storage:",
-            error
-          );
-          storageServiceInstance = getLocalStorageService();
-          console.log("Using local storage service (fallback)");
-        }
-        break;
-      case "local":
-      default:
-        storageServiceInstance = getLocalStorageService();
-        console.log("Using local storage service");
-        break;
-    }
+    storageServiceInstance = getLocalStorageService();
+    console.log("Using local storage service");
   }
 
   return storageServiceInstance;
 };
 
 // Export individual services for direct access if needed
-export { S3Service, LocalStorageService };
+export { LocalStorageService };

@@ -45,6 +45,8 @@ import paymentTransactionRoutes from "./routes/paymentTransactionRoutes";
 import writeBookRoutes from "./routes/writeBook";
 // Email campaign routes
 import emailCampaignRoutes from "./routes/emailCampaignRoutes";
+// Media management routes
+import mediaRoutes from "./routes/media";
 import { setWebSocketManager } from "./controllers/auctionController";
 
 // Load environment variables
@@ -63,7 +65,12 @@ const wsManager = new WebSocketManager(server);
 setWebSocketManager(wsManager);
 
 // Security middleware
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginEmbedderPolicy: false, // Allow embedding images from different origins
+    crossOriginResourcePolicy: false, // Allow cross-origin resources
+  })
+);
 // Compression - but exclude webhook endpoints to preserve raw body
 app.use(
   compression({
@@ -98,35 +105,14 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// Manual CORS headers for development
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header(
-    "Access-Control-Allow-Methods",
-    "GET, POST, PUT, DELETE, PATCH, OPTIONS"
-  );
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, Range, Accept, Origin, X-Requested-With"
-  );
-  res.header(
-    "Access-Control-Expose-Headers",
-    "Content-Range, Content-Length, Accept-Ranges"
-  );
-
-  if (req.method === "OPTIONS") {
-    res.sendStatus(200);
-  } else {
-    next();
-  }
-});
-
 // CORS configuration - Locked to EPUB viewer origins in production
 const corsOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(",").map((origin) => origin.trim())
   : true; // Allow all origins in development
 
+// CORS for API routes (with credentials)
 app.use(
+  "/api",
   cors({
     origin: corsOrigins,
     credentials: true,
@@ -140,6 +126,18 @@ app.use(
       "X-Requested-With",
     ],
     exposedHeaders: ["Content-Range", "Content-Length", "Accept-Ranges"],
+    preflightContinue: false,
+    optionsSuccessStatus: 200,
+  })
+);
+
+// CORS for static files (no credentials, allow all)
+app.use(
+  "/uploads",
+  cors({
+    origin: "*",
+    methods: ["GET", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Accept"],
     preflightContinue: false,
     optionsSuccessStatus: 200,
   })
@@ -210,6 +208,8 @@ app.use("/api/payment-transactions", paymentTransactionRoutes);
 app.use("/api/write-book", writeBookRoutes);
 // Email campaign routes
 app.use("/api/email-campaigns", emailCampaignRoutes);
+// Media management routes
+app.use("/api/media", mediaRoutes);
 
 // Error handling middleware
 app.use(notFound);
