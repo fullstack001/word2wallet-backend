@@ -2,6 +2,9 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { Readable } from "stream";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 export interface LocalStorageConfig {
   uploadPath: string;
