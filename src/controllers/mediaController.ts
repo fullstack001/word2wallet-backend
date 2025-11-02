@@ -7,6 +7,8 @@ import fs from "fs/promises";
 import { getStorageService } from "../services/storageService";
 import { CustomError } from "../middleware/errorHandler";
 import sharp from "sharp"; // For image metadata extraction
+import dotenv from "dotenv";
+dotenv.config();
 
 export class MediaController {
   private static openai: OpenAI | null = null;
@@ -197,7 +199,8 @@ export class MediaController {
         uploadedAt: new Date().toISOString(),
       });
 
-      const publicUrl = storageService.getPublicUrl(fileName);
+      const publicUrl = `${process.env.BASE_URL}/${fileName}`;
+      console.log("publicUrl", publicUrl);
 
       // Clean up temporary file
       await fs.unlink(file.path).catch(() => {});
@@ -293,7 +296,8 @@ export class MediaController {
         uploadedAt: new Date().toISOString(),
       });
 
-      const publicUrl = storageService.getPublicUrl(fileName);
+      const publicUrl = `${process.env.BASE_URL}/${fileName}`;
+      console.log("publicUrl", publicUrl);
 
       // Extract image dimensions
       let width: number | undefined;
@@ -397,7 +401,8 @@ export class MediaController {
         uploadedAt: new Date().toISOString(),
       });
 
-      const publicUrl = storageService.getPublicUrl(fileName);
+      const publicUrl = `${process.env.BASE_URL}/${fileName}`;
+      console.log("publicUrl", publicUrl);
 
       // Create media record
       const media = await Media.create({
