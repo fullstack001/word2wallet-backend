@@ -7,6 +7,11 @@ import {
   refreshTokenValidation,
   updateProfileValidation,
   changePasswordValidation,
+  verifyEmailValidation,
+  resendVerificationValidation,
+  verifyCodeValidation,
+  forgotPasswordValidation,
+  resetPasswordValidation,
 } from "../validation";
 
 const router = Router();
@@ -33,5 +38,22 @@ router.put(
   AuthController.changePassword
 );
 router.post("/logout", authenticate, AuthController.logout);
+router.post("/verify-email", verifyEmailValidation, AuthController.verifyEmail);
+router.post(
+  "/resend-verification",
+  resendVerificationValidation,
+  AuthController.resendVerificationEmail
+);
+router.post("/verify-code", verifyCodeValidation, AuthController.verifyCode);
+router.post(
+  "/forgot-password",
+  forgotPasswordValidation,
+  AuthController.forgotPassword
+);
+router.post(
+  "/reset-password",
+  resetPasswordValidation,
+  AuthController.resetPassword
+);
 
 export default router;

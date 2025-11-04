@@ -1,4 +1,6 @@
 import { IUser } from "../types";
+import dotenv from "dotenv";
+dotenv.config();
 
 export interface EmailTemplate {
   subject: string;
@@ -38,7 +40,7 @@ export class EmailTemplates {
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Word2Wallet</title>
+        <title>Wortowallet</title>
         <meta name="format-detection" content="telephone=no">
         <meta name="x-apple-disable-message-reformatting">
         <style>
@@ -139,10 +141,10 @@ export class EmailTemplates {
     return `
       <div style="text-align: center; margin-top: 20px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
         <p style="margin: 0; font-size: 12px; color: #666;">
-          © 2024 Word2Wallet. All rights reserved.<br>
+          © 2024 Wortowallet. All rights reserved.<br>
           ${
             additionalText ||
-            "You're receiving this email because you have an account with Word2Wallet."
+            "You're receiving this email because you have an account with Wortowallet."
           }
         </p>
       </div>
@@ -173,7 +175,7 @@ export class EmailTemplates {
         user.firstName
       }!</h2>
       
-      <p style="color: #333; font-size: 16px; line-height: 1.6;">Welcome to Word2Wallet Pro! Your 7-day free trial is now active and you have full access to all our premium features.</p>
+      <p style="color: #333; font-size: 16px; line-height: 1.6;">Welcome to Wortowallet Pro! Your 7-day free trial is now active and you have full access to all our premium features.</p>
       
       ${this.createInfoBox(
         "✨ What you get with your trial:",
@@ -207,7 +209,7 @@ export class EmailTemplates {
       )}
       
       ${this.createButton(
-        "Start Using Word2Wallet Pro",
+        "Start Using Wortowallet Pro",
         `${process.env.FRONTEND_URL}/`,
         "white",
         "#007bff"
@@ -220,20 +222,20 @@ export class EmailTemplates {
 
     const html = this.getBaseTemplate(
       this.createHeader(
-        "🎉 Welcome to Word2Wallet Pro!",
+        "🎉 Welcome to Wortowallet Pro!",
         "Your 7-day free trial has started"
       ) +
         this.createContent(content) +
         this.createFooter(
-          "You're receiving this email because you started a trial with Word2Wallet."
+          "You're receiving this email because you started a trial with Wortowallet."
         )
     );
 
-    const text = `Welcome to Word2Wallet Pro!
+    const text = `Welcome to Wortowallet Pro!
 
 Hi ${user.firstName}!
 
-Welcome to Word2Wallet Pro! Your 7-day free trial is now active and you have full access to all our premium features.
+Welcome to Wortowallet Pro! Your 7-day free trial is now active and you have full access to all our premium features.
 
 What you get with your trial:
 - Full platform access
@@ -256,13 +258,13 @@ Get started: ${process.env.FRONTEND_URL}/
 Questions? Reply to this email or contact our support team.
 
 Best regards,
-The Word2Wallet Team
+The Wortowallet Team
 
-You're receiving this email because you started a trial with Word2Wallet.`;
+You're receiving this email because you started a trial with Wortowallet.`;
 
     return {
       subject:
-        "🎉 Welcome to Word2Wallet Pro - Your 7-Day Free Trial Has Started!",
+        "🎉 Welcome to Wortowallet Pro - Your 7-Day Free Trial Has Started!",
       html,
       text,
     };
@@ -281,12 +283,12 @@ You're receiving this email because you started a trial with Word2Wallet.`;
         user.firstName
       }!</h2>
       
-      <p style="color: #333; font-size: 16px; line-height: 1.6;">Your 7-day free trial has ended and we're now processing your payment to continue your Word2Wallet Pro subscription.</p>
+      <p style="color: #333; font-size: 16px; line-height: 1.6;">Your 7-day free trial has ended and we're now processing your payment to continue your Wortowallet Pro subscription.</p>
       
       ${this.createInfoBox(
         "📋 Payment Details:",
         this.createList([
-          "<strong>Plan:</strong> Word2Wallet Pro",
+          "<strong>Plan:</strong> Wortowallet Pro",
           "<strong>Amount:</strong> $20.00/month",
           `<strong>Next billing date:</strong> ${subscriptionEndDate.toLocaleDateString(
             "en-US",
@@ -326,7 +328,7 @@ You're receiving this email because you started a trial with Word2Wallet.`;
     `;
 
     return {
-      subject: "💳 Your Word2Wallet Pro subscription is being processed",
+      subject: "💳 Your Wortowallet Pro subscription is being processed",
       html: this.getBaseTemplate(
         this.createHeader(
           "💳 Payment Processing",
@@ -354,12 +356,12 @@ You're receiving this email because you started a trial with Word2Wallet.`;
         user.firstName
       }!</h2>
       
-      <p style="color: #333; font-size: 16px; line-height: 1.6;">Your payment has been processed successfully and your Word2Wallet Pro subscription is now active. Thank you for choosing Word2Wallet!</p>
+      <p style="color: #333; font-size: 16px; line-height: 1.6;">Your payment has been processed successfully and your Wortowallet Pro subscription is now active. Thank you for choosing Wortowallet!</p>
       
       ${this.createInfoBox(
         "🎉 Your subscription details:",
         this.createList([
-          "<strong>Plan:</strong> Word2Wallet Pro",
+          "<strong>Plan:</strong> Wortowallet Pro",
           "<strong>Status:</strong> Active",
           "<strong>Amount:</strong> $20.00/month",
           `<strong>Next billing date:</strong> ${subscriptionEndDate.toLocaleDateString(
@@ -403,11 +405,11 @@ You're receiving this email because you started a trial with Word2Wallet.`;
     `;
 
     return {
-      subject: "✅ Welcome to Word2Wallet Pro - Your subscription is active!",
+      subject: "✅ Welcome to Wortowallet Pro - Your subscription is active!",
       html: this.getBaseTemplate(
         this.createHeader(
           "✅ Subscription Active!",
-          "Your Word2Wallet Pro subscription is now active",
+          "Your Wortowallet Pro subscription is now active",
           "linear-gradient(135deg, #28a745 0%, #20c997 100%)"
         ) +
           this.createContent(content) +
@@ -431,7 +433,7 @@ You're receiving this email because you started a trial with Word2Wallet.`;
         user.firstName
       }!</h2>
       
-      <p style="color: #333; font-size: 16px; line-height: 1.6;">We were unable to process your payment for your Word2Wallet Pro subscription. This could be due to an expired card, insufficient funds, or other payment issues.</p>
+      <p style="color: #333; font-size: 16px; line-height: 1.6;">We were unable to process your payment for your Wortowallet Pro subscription. This could be due to an expired card, insufficient funds, or other payment issues.</p>
       
       ${this.createInfoBox(
         "🚨 What you need to do:",
@@ -498,11 +500,11 @@ You're receiving this email because you started a trial with Word2Wallet.`;
     const { user } = data;
 
     const content = `
-      <h2 style="color: #333; margin-top: 0; font-size: 24px;">Welcome to Word2Wallet, ${
+      <h2 style="color: #333; margin-top: 0; font-size: 24px;">Welcome to Wortowallet, ${
         user.firstName
       }!</h2>
       
-      <p style="color: #333; font-size: 16px; line-height: 1.6;">Thank you for joining Word2Wallet! We're excited to help you create amazing interactive content.</p>
+      <p style="color: #333; font-size: 16px; line-height: 1.6;">Thank you for joining Wortowallet! We're excited to help you create amazing interactive content.</p>
       
       ${this.createInfoBox(
         "🚀 Get started with:",
@@ -531,15 +533,15 @@ You're receiving this email because you started a trial with Word2Wallet.`;
     `;
 
     return {
-      subject: "🎉 Welcome to Word2Wallet!",
+      subject: "🎉 Welcome to Wortowallet!",
       html: this.getBaseTemplate(
         this.createHeader(
-          "🎉 Welcome to Word2Wallet!",
+          "🎉 Welcome to Wortowallet!",
           "Let's create something amazing together"
         ) +
           this.createContent(content) +
           this.createFooter(
-            "You're receiving this email because you created an account with Word2Wallet."
+            "You're receiving this email because you created an account with Wortowallet."
           )
       ),
     };
@@ -553,42 +555,84 @@ You're receiving this email because you started a trial with Word2Wallet.`;
   ): EmailTemplate {
     const { user, resetToken } = data;
 
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+    const resetUrl = `${process.env.FRONTEND_URL}/en/reset-password?token=${resetToken}`;
 
     const content = `
-      <h2 style="color: #333; margin-top: 0; font-size: 24px;">Hi ${
+      <h2 style="color: #333; margin-top: 0; font-size: 24px;">Reset Your Password</h2>
+      
+      <p style="color: #333; font-size: 16px; line-height: 1.6;">Hi ${
         user.firstName
-      }!</h2>
+      },</p>
       
-      <p style="color: #333; font-size: 16px; line-height: 1.6;">We received a request to reset your password for your Word2Wallet account.</p>
+      <p style="color: #333; font-size: 16px; line-height: 1.6;">We received a request to reset your password. Click the button below to create a new password:</p>
       
-      ${this.createInfoBox(
-        "🔐 Reset your password:",
-        `
-          <p style="margin: 0; color: #333;">Click the button below to reset your password. This link will expire in 1 hour.</p>
-        `,
-        "#6c757d",
-        "#e2e3e5"
-      )}
+      ${this.createButton("Reset Password", resetUrl, "white", "#dc3545")}
       
-      ${this.createButton("Reset Password", resetUrl, "white", "#6c757d")}
-      
-      <p style="font-size: 14px; color: #666; margin-top: 30px;">
-        If you didn't request this password reset, please ignore this email. Your password will remain unchanged.
+      <p style="font-size: 14px; color: #666; margin-top: 20px;">
+        This link will expire in 1 hour. If you didn't request a password reset, you can safely ignore this email.
       </p>
     `;
 
     return {
-      subject: "🔐 Reset your Word2Wallet password",
+      subject: "Reset Your Wortowallet Password",
       html: this.getBaseTemplate(
         this.createHeader(
-          "🔐 Password Reset",
-          "Reset your Word2Wallet password",
-          "linear-gradient(135deg, #6c757d 0%, #495057 100%)"
+          "Reset Your Password",
+          "Create a new password for your account"
         ) +
           this.createContent(content) +
           this.createFooter(
-            "You're receiving this email because you requested a password reset."
+            "You're receiving this email because a password reset was requested for your account."
+          )
+      ),
+    };
+  }
+
+  /**
+   * Email Verification Template
+   */
+  static getEmailVerificationEmail(
+    data: EmailTemplateData & {
+      verificationToken: string;
+      verificationCode: string;
+    }
+  ): EmailTemplate {
+    const { user, verificationToken, verificationCode } = data;
+
+    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
+
+    const content = `
+      <h2 style="color: #333; margin-top: 0; font-size: 24px;">Verify Your Email Address</h2>
+      
+      <p style="color: #333; font-size: 16px; line-height: 1.6;">Hi ${user.firstName},</p>
+      
+      <p style="color: #333; font-size: 16px; line-height: 1.6;">Thank you for signing up for Wortowallet! Please enter the verification code below to complete your registration:</p>
+      
+      <div style="text-align: center; margin: 30px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; border: 2px dashed #007bff;">
+        <p style="margin: 0 0 10px 0; font-size: 14px; color: #666; font-weight: bold;">Your verification code:</p>
+        <p style="margin: 0; font-size: 36px; font-weight: bold; color: #007bff; letter-spacing: 8px; font-family: monospace;">${verificationCode}</p>
+      </div>
+      
+      <p style="color: #333; font-size: 14px; line-height: 1.6; margin-top: 20px;">
+        Enter this code on the signup page to verify your email address and complete your registration.
+      </p>     
+      
+      
+      <p style="font-size: 12px; color: #999; margin-top: 20px;">
+        If you didn't create an account, you can safely ignore this email.
+      </p>
+    `;
+
+    return {
+      subject: "Verify Your Wortowallet Email Address",
+      html: this.getBaseTemplate(
+        this.createHeader(
+          "Verify Your Email",
+          "Please confirm your email address to complete your registration"
+        ) +
+          this.createContent(content) +
+          this.createFooter(
+            "You're receiving this email because you created an account with Wortowallet."
           )
       ),
     };
@@ -607,7 +651,7 @@ You're receiving this email because you started a trial with Word2Wallet.`;
         user.firstName
       }!</h2>
       
-      <p style="color: #333; font-size: 16px; line-height: 1.6;">We're sorry to see you go! Your Word2Wallet Pro subscription has been cancelled.</p>
+      <p style="color: #333; font-size: 16px; line-height: 1.6;">We're sorry to see you go! Your Wortowallet Pro subscription has been cancelled.</p>
       
       ${this.createInfoBox(
         "📅 Cancellation Details:",
@@ -648,12 +692,12 @@ You're receiving this email because you started a trial with Word2Wallet.`;
       )}
       
       <p style="font-size: 14px; color: #666; margin-top: 30px;">
-        Thank you for being part of the Word2Wallet community. We hope to see you again soon!
+        Thank you for being part of the Wortowallet community. We hope to see you again soon!
       </p>
     `;
 
     return {
-      subject: "👋 Your Word2Wallet Pro subscription has been cancelled",
+      subject: "👋 Your Wortowallet Pro subscription has been cancelled",
       html: this.getBaseTemplate(
         this.createHeader(
           "👋 Subscription Cancelled",

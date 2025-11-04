@@ -47,6 +47,8 @@ import writeBookRoutes from "./routes/writeBook";
 import emailCampaignRoutes from "./routes/emailCampaignRoutes";
 // Media management routes
 import mediaRoutes from "./routes/media";
+// Blog routes
+import blogRoutes from "./routes/blogs";
 import { setWebSocketManager } from "./controllers/auctionController";
 
 // Load environment variables
@@ -210,6 +212,8 @@ app.use("/api/write-book", writeBookRoutes);
 app.use("/api/email-campaigns", emailCampaignRoutes);
 // Media management routes
 app.use("/api/media", mediaRoutes);
+// Blog routes
+app.use("/api/blogs", blogRoutes);
 
 // Error handling middleware
 app.use(notFound);

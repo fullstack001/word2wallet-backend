@@ -3,3 +3,4 @@ export * from "./authValidation";
 export * from "./subjectValidation";
 export * from "./courseValidation";
 export * from "./userValidation";
+export * from "./blogValidation";

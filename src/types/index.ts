@@ -14,6 +14,13 @@ export interface IUser extends Document {
   lastLogin?: Date;
   emailUnsubscribed: boolean;
   emailUnsubscribedAt?: Date;
+  emailVerified: boolean;
+  emailVerificationToken?: string;
+  emailVerificationTokenExpiry?: Date;
+  emailVerificationCode?: string;
+  emailVerificationCodeExpiry?: Date;
+  passwordResetToken?: string;
+  passwordResetTokenExpiry?: Date;
   subscription?: ISubscription;
   trialEligible: boolean;
   hasCanceledSubscription: boolean;
@@ -22,6 +29,10 @@ export interface IUser extends Document {
   fullName: string;
   comparePassword(candidatePassword: string): Promise<boolean>;
   updateLastLogin(): Promise<IUser>;
+  generateEmailVerificationToken(): Promise<IUser>;
+  verifyEmail(): Promise<IUser>;
+  generatePasswordResetToken(): Promise<IUser>;
+  clearPasswordResetToken(): Promise<IUser>;
 }
 
 // Subscription Types
@@ -730,4 +741,71 @@ export interface JobQuery extends PaginationQuery {
   type?: JobType;
   status?: JobStatus;
   bookId?: string;
+}
+
+// Blog Types
+export interface IBlog extends Document {
+  _id: string;
+  title: string;
+  slug: string;
+  content: string;
+  excerpt?: string;
+  featuredImage?: string;
+  tags: string[];
+  status: "draft" | "published";
+  author: mongoose.Types.ObjectId;
+  views: number;
+  reactionsCount: number;
+  commentsCount: number;
+  isActive: boolean;
+  publishedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  isPublished: boolean;
+  incrementViews(): Promise<IBlog>;
+}
+
+export interface IBlogModel extends mongoose.Model<IBlog> {
+  findPublished(): mongoose.Query<IBlog[], IBlog>;
+  findRelated(
+    blogId: string,
+    tags: string[],
+    limit?: number
+  ): mongoose.Query<IBlog[], IBlog>;
+}
+
+// Comment Types
+export interface IComment extends Document {
+  _id: string;
+  blog: mongoose.Types.ObjectId;
+  user?: mongoose.Types.ObjectId; // Optional for anonymous comments
+  anonymousName?: string; // For anonymous comments
+  anonymousEmail?: string; // For anonymous comments
+  content: string;
+  parent?: mongoose.Types.ObjectId | null;
+  likes: number;
+  likedBy: mongoose.Types.ObjectId[];
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  replies?: IComment[];
+  toggleLike(userId: string): Promise<IComment>;
+}
+
+// Reaction Types
+export interface IReaction extends Document {
+  _id: string;
+  blog: mongoose.Types.ObjectId;
+  user: mongoose.Types.ObjectId;
+  type: "like" | "love" | "thumbsup" | "thumbsdown";
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Blog Query Types
+export interface BlogQuery extends PaginationQuery {
+  search?: string;
+  status?: "draft" | "published";
+  tag?: string;
+  author?: string;
 }

@@ -1,10 +1,11 @@
 import { IUser } from "../types";
 import { EmailTemplates } from "./emailTemplates";
 import https from "https";
-
+import dotenv from "dotenv";
+dotenv.config();
 const DOMAIN = process.env.MAILGUN_DOMAIN!;
 const API_KEY = process.env.MAILGUN_API_KEY!;
-const FROM_EMAIL = process.env.MAILGUN_FROM_EMAIL || "noreply@word2wallet.com";
+const FROM_EMAIL = process.env.MAILGUN_FROM_EMAIL || "noreply@wordtowallet.com";
 const REGION = (process.env.MAILGUN_REGION || "US").toUpperCase();
 const API_BASE = REGION === "EU" ? "api.eu.mailgun.net" : "api.mailgun.net";
 
@@ -94,18 +95,18 @@ export class EmailService {
       });
 
       const data = {
-        from: `Word2Wallet <${FROM_EMAIL}>`,
+        from: `wordtowallet <${FROM_EMAIL}>`,
         to: [user.email],
         subject: template.subject,
         text: template.text || this.generateTextVersion(template.html),
         html: template.html,
-        "h:Reply-To": "support@word2wallet.com",
+        "h:Reply-To": "support@wordtowallet.com",
         "h:X-Mailgun-Track": "yes",
         "h:X-Mailgun-Track-Clicks": "yes",
         "h:X-Mailgun-Track-Opens": "yes",
-        "h:List-Unsubscribe": `<https://word2wallet.com/unsubscribe?email=${encodeURIComponent(
+        "h:List-Unsubscribe": `<https://wordtowallet.com/unsubscribe?email=${encodeURIComponent(
           user.email
-        )}>, <mailto:unsubscribe@word2wallet.com?subject=Unsubscribe>`,
+        )}>, <mailto:unsubscribe@wordtowallet.com?subject=Unsubscribe>`,
         "h:List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
       };
 
@@ -140,18 +141,18 @@ export class EmailService {
       });
 
       const data = {
-        from: `Word2Wallet <${FROM_EMAIL}>`,
+        from: `wordtowallet <${FROM_EMAIL}>`,
         to: [user.email],
         subject: template.subject,
         text: template.text || this.generateTextVersion(template.html),
         html: template.html,
-        "h:Reply-To": "support@word2wallet.com",
+        "h:Reply-To": "support@wordtowallet.com",
         "h:X-Mailgun-Track": "yes",
         "h:X-Mailgun-Track-Clicks": "yes",
         "h:X-Mailgun-Track-Opens": "yes",
-        "h:List-Unsubscribe": `<https://word2wallet.com/unsubscribe?email=${encodeURIComponent(
+        "h:List-Unsubscribe": `<https://wordtowallet.com/unsubscribe?email=${encodeURIComponent(
           user.email
-        )}>, <mailto:unsubscribe@word2wallet.com?subject=Unsubscribe>`,
+        )}>, <mailto:unsubscribe@wordtowallet.com?subject=Unsubscribe>`,
         "h:List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
       };
 
@@ -183,18 +184,18 @@ export class EmailService {
       });
 
       const data = {
-        from: `Word2Wallet <${FROM_EMAIL}>`,
+        from: `wordtowallet <${FROM_EMAIL}>`,
         to: [user.email],
         subject: template.subject,
         text: template.text || this.generateTextVersion(template.html),
         html: template.html,
-        "h:Reply-To": "support@word2wallet.com",
+        "h:Reply-To": "support@wordtowallet.com",
         "h:X-Mailgun-Track": "yes",
         "h:X-Mailgun-Track-Clicks": "yes",
         "h:X-Mailgun-Track-Opens": "yes",
-        "h:List-Unsubscribe": `<https://word2wallet.com/unsubscribe?email=${encodeURIComponent(
+        "h:List-Unsubscribe": `<https://wordtowallet.com/unsubscribe?email=${encodeURIComponent(
           user.email
-        )}>, <mailto:unsubscribe@word2wallet.com?subject=Unsubscribe>`,
+        )}>, <mailto:unsubscribe@wordtowallet.com?subject=Unsubscribe>`,
         "h:List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
       };
 
@@ -226,18 +227,18 @@ export class EmailService {
       });
 
       const data = {
-        from: `Word2Wallet <${FROM_EMAIL}>`,
+        from: `wordtowallet <${FROM_EMAIL}>`,
         to: [user.email],
         subject: template.subject,
         text: template.text || this.generateTextVersion(template.html),
         html: template.html,
-        "h:Reply-To": "support@word2wallet.com",
+        "h:Reply-To": "support@wordtowallet.com",
         "h:X-Mailgun-Track": "yes",
         "h:X-Mailgun-Track-Clicks": "yes",
         "h:X-Mailgun-Track-Opens": "yes",
-        "h:List-Unsubscribe": `<https://word2wallet.com/unsubscribe?email=${encodeURIComponent(
+        "h:List-Unsubscribe": `<https://wordtowallet.com/unsubscribe?email=${encodeURIComponent(
           user.email
-        )}>, <mailto:unsubscribe@word2wallet.com?subject=Unsubscribe>`,
+        )}>, <mailto:unsubscribe@wordtowallet.com?subject=Unsubscribe>`,
         "h:List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
       };
 
@@ -263,12 +264,12 @@ export class EmailService {
   }) {
     try {
       const data = {
-        from: options.from || `Word2Wallet <${FROM_EMAIL}>`,
+        from: options.from || `wordtowallet <${FROM_EMAIL}>`,
         to: [options.to],
         subject: options.subject,
         text: options.text || this.generateTextVersion(options.html),
         html: options.html,
-        "h:Reply-To": options.replyTo || "support@word2wallet.com",
+        "h:Reply-To": options.replyTo || "support@wordtowallet.com",
         "h:X-Mailgun-Track": "yes",
         "h:X-Mailgun-Track-Clicks": "yes",
         "h:X-Mailgun-Track-Opens": "yes",
@@ -299,18 +300,18 @@ export class EmailService {
       const template = EmailTemplates.getWelcomeEmail({ user });
 
       const data = {
-        from: `Word2Wallet <${FROM_EMAIL}>`,
+        from: `wordtowallet <${FROM_EMAIL}>`,
         to: [user.email],
         subject: template.subject,
         text: template.text || this.generateTextVersion(template.html),
         html: template.html,
-        "h:Reply-To": "support@word2wallet.com",
+        "h:Reply-To": "support@wordtowallet.com",
         "h:X-Mailgun-Track": "yes",
         "h:X-Mailgun-Track-Clicks": "yes",
         "h:X-Mailgun-Track-Opens": "yes",
-        "h:List-Unsubscribe": `<https://word2wallet.com/unsubscribe?email=${encodeURIComponent(
+        "h:List-Unsubscribe": `<https://wordtowallet.com/unsubscribe?email=${encodeURIComponent(
           user.email
-        )}>, <mailto:unsubscribe@word2wallet.com?subject=Unsubscribe>`,
+        )}>, <mailto:unsubscribe@wordtowallet.com?subject=Unsubscribe>`,
         "h:List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
       };
 
@@ -328,33 +329,21 @@ export class EmailService {
    */
   static async sendPasswordResetEmail(user: IUser, resetToken: string) {
     try {
-      // Check if user has unsubscribed from emails
-      if (user.emailUnsubscribed) {
-        console.log(
-          `User ${user.email} has unsubscribed from emails, skipping password reset email`
-        );
-        return null;
-      }
-
       const template = EmailTemplates.getPasswordResetEmail({
         user,
         resetToken,
       });
 
       const data = {
-        from: `Word2Wallet <${FROM_EMAIL}>`,
+        from: `wordtowallet <${FROM_EMAIL}>`,
         to: [user.email],
         subject: template.subject,
         text: template.text || this.generateTextVersion(template.html),
         html: template.html,
-        "h:Reply-To": "support@word2wallet.com",
+        "h:Reply-To": "support@wordtowallet.com",
         "h:X-Mailgun-Track": "yes",
         "h:X-Mailgun-Track-Clicks": "yes",
         "h:X-Mailgun-Track-Opens": "yes",
-        "h:List-Unsubscribe": `<https://word2wallet.com/unsubscribe?email=${encodeURIComponent(
-          user.email
-        )}>, <mailto:unsubscribe@word2wallet.com?subject=Unsubscribe>`,
-        "h:List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
       };
 
       const response = await this.sendEmailViaHTTP(data);
@@ -362,6 +351,42 @@ export class EmailService {
       return response;
     } catch (error) {
       console.error("Failed to send password reset email:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send email verification email
+   */
+  static async sendEmailVerificationEmail(
+    user: IUser,
+    verificationToken: string,
+    verificationCode: string
+  ) {
+    try {
+      const template = EmailTemplates.getEmailVerificationEmail({
+        user,
+        verificationToken,
+        verificationCode,
+      });
+
+      const data = {
+        from: `wordtowallet <${FROM_EMAIL}>`,
+        to: [user.email],
+        subject: template.subject,
+        text: template.text || this.generateTextVersion(template.html),
+        html: template.html,
+        "h:Reply-To": "support@wordtowallet.com",
+        "h:X-Mailgun-Track": "yes",
+        "h:X-Mailgun-Track-Clicks": "yes",
+        "h:X-Mailgun-Track-Opens": "yes",
+      };
+
+      const response = await this.sendEmailViaHTTP(data);
+      console.log("Email verification email sent:", response);
+      return response;
+    } catch (error) {
+      console.error("Failed to send email verification email:", error);
       throw error;
     }
   }
@@ -388,18 +413,18 @@ export class EmailService {
       });
 
       const data = {
-        from: `Word2Wallet <${FROM_EMAIL}>`,
+        from: `wordtowallet <${FROM_EMAIL}>`,
         to: [user.email],
         subject: template.subject,
         text: template.text || this.generateTextVersion(template.html),
         html: template.html,
-        "h:Reply-To": "support@word2wallet.com",
+        "h:Reply-To": "support@wordtowallet.com",
         "h:X-Mailgun-Track": "yes",
         "h:X-Mailgun-Track-Clicks": "yes",
         "h:X-Mailgun-Track-Opens": "yes",
-        "h:List-Unsubscribe": `<https://word2wallet.com/unsubscribe?email=${encodeURIComponent(
+        "h:List-Unsubscribe": `<https://wordtowallet.com/unsubscribe?email=${encodeURIComponent(
           user.email
-        )}>, <mailto:unsubscribe@word2wallet.com?subject=Unsubscribe>`,
+        )}>, <mailto:unsubscribe@wordtowallet.com?subject=Unsubscribe>`,
         "h:List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
       };
 
@@ -482,7 +507,7 @@ export class EmailService {
     </div>
     <div class="footer">
       <p>This email was sent to ${email}</p>
-      <p>© ${new Date().getFullYear()} Word2Wallet. All rights reserved.</p>
+      <p>© ${new Date().getFullYear()} wordtowallet. All rights reserved.</p>
     </div>
   </div>
 </body>
@@ -513,16 +538,16 @@ Enjoy your reading!
 
 ---
 This email was sent to ${email}
-© ${new Date().getFullYear()} Word2Wallet. All rights reserved.
+© ${new Date().getFullYear()} wordtowallet. All rights reserved.
       `;
 
       const data = {
-        from: `Word2Wallet <${FROM_EMAIL}>`,
+        from: `wordtowallet <${FROM_EMAIL}>`,
         to: [email],
         subject: `Your Book is Ready: ${bookTitle}`,
         text: textContent,
         html: htmlContent,
-        "h:Reply-To": "support@word2wallet.com",
+        "h:Reply-To": "support@wordtowallet.com",
         "h:X-Mailgun-Track": "yes",
         "h:X-Mailgun-Track-Clicks": "yes",
         "h:X-Mailgun-Track-Opens": "yes",

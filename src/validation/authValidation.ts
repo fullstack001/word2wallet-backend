@@ -2,10 +2,7 @@ import { body } from "express-validator";
 
 // Register validation rules
 export const registerValidation = [
-  body("email")
-    .isEmail()
-    .normalizeEmail()
-    .withMessage("Please provide a valid email"),
+  body("email").isEmail().withMessage("Please provide a valid email"),
   body("password")
     .isLength({ min: 6 })
     .withMessage("Password must be at least 6 characters long"),
@@ -25,10 +22,7 @@ export const registerValidation = [
 
 // Login validation rules
 export const loginValidation = [
-  body("email")
-    .isEmail()
-    .normalizeEmail()
-    .withMessage("Please provide a valid email"),
+  body("email").isEmail().withMessage("Please provide a valid email"),
   body("password").notEmpty().withMessage("Password is required"),
 ];
 
@@ -59,4 +53,37 @@ export const changePasswordValidation = [
   body("newPassword")
     .isLength({ min: 6 })
     .withMessage("New password must be at least 6 characters long"),
+];
+
+// Verify email validation rules
+export const verifyEmailValidation = [
+  body("token").notEmpty().withMessage("Verification token is required"),
+];
+
+// Resend verification email validation rules
+export const resendVerificationValidation = [
+  body("email").isEmail().withMessage("Please provide a valid email"),
+];
+
+// Verify code validation rules
+export const verifyCodeValidation = [
+  body("email").isEmail().withMessage("Please provide a valid email"),
+  body("code")
+    .isLength({ min: 6, max: 6 })
+    .withMessage("Verification code must be 6 digits")
+    .matches(/^\d+$/)
+    .withMessage("Verification code must contain only numbers"),
+];
+
+// Forgot password validation rules
+export const forgotPasswordValidation = [
+  body("email").isEmail().withMessage("Please provide a valid email"),
+];
+
+// Reset password validation rules
+export const resetPasswordValidation = [
+  body("token").notEmpty().withMessage("Reset token is required"),
+  body("password")
+    .isLength({ min: 6 })
+    .withMessage("Password must be at least 6 characters long"),
 ];

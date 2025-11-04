@@ -57,6 +57,31 @@ const userSchema = new Schema<IUser>(
     emailUnsubscribedAt: {
       type: Date,
     },
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    emailVerificationToken: {
+      type: String,
+      sparse: true,
+    },
+    emailVerificationTokenExpiry: {
+      type: Date,
+    },
+    emailVerificationCode: {
+      type: String,
+      sparse: true,
+    },
+    emailVerificationCodeExpiry: {
+      type: Date,
+    },
+    passwordResetToken: {
+      type: String,
+      sparse: true,
+    },
+    passwordResetTokenExpiry: {
+      type: Date,
+    },
     subscription: {
       stripeCustomerId: {
         type: String,
@@ -151,6 +176,51 @@ userSchema.methods.comparePassword = async function (
 // Update last login method
 userSchema.methods.updateLastLogin = function () {
   this.lastLogin = new Date();
+  return this.save();
+};
+
+// Generate email verification token method
+userSchema.methods.generateEmailVerificationToken = function () {
+  const crypto = require("crypto");
+  const token = crypto.randomBytes(32).toString("hex");
+  // Generate 6-digit verification code
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+  this.emailVerificationToken = token;
+  this.emailVerificationCode = code;
+  // Token and code expire in 24 hours
+  this.emailVerificationTokenExpiry = new Date(
+    Date.now() + 24 * 60 * 60 * 1000
+  );
+  this.emailVerificationCodeExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  return this.save();
+};
+
+// Verify email method
+userSchema.methods.verifyEmail = function () {
+  this.emailVerified = true;
+  this.emailVerificationToken = undefined;
+  this.emailVerificationTokenExpiry = undefined;
+  this.emailVerificationCode = undefined;
+  this.emailVerificationCodeExpiry = undefined;
+  return this.save();
+};
+
+// Generate password reset token method
+userSchema.methods.generatePasswordResetToken = function () {
+  const crypto = require("crypto");
+  const token = crypto.randomBytes(32).toString("hex");
+
+  this.passwordResetToken = token;
+  // Token expires in 1 hour
+  this.passwordResetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
+  return this.save();
+};
+
+// Clear password reset token method
+userSchema.methods.clearPasswordResetToken = function () {
+  this.passwordResetToken = undefined;
+  this.passwordResetTokenExpiry = undefined;
   return this.save();
 };
 
