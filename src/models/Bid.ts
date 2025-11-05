@@ -35,6 +35,37 @@ const bidSchema = new Schema<IBid>(
       type: String,
       maxlength: [500, "User agent cannot exceed 500 characters"],
     },
+    shippingInfo: {
+      country: {
+        type: String,
+        trim: true,
+      },
+      street: {
+        type: String,
+        trim: true,
+      },
+      city: {
+        type: String,
+        trim: true,
+      },
+      state: {
+        type: String,
+        trim: true,
+      },
+      zipCode: {
+        type: String,
+        trim: true,
+      },
+      phone: {
+        type: String,
+        trim: true,
+      },
+      email: {
+        type: String,
+        trim: true,
+        lowercase: true,
+      },
+    },
   },
   {
     timestamps: true,

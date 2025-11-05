@@ -60,7 +60,7 @@ export const getAuctionSnapshot = async (req: Request, res: Response) => {
 export const placeBid = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { amount } = req.body;
+    const { amount, shippingInfo } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
@@ -124,6 +124,7 @@ export const placeBid = async (req: AuthRequest, res: Response) => {
       amount: amount,
       ipAddress: req.ip || req.connection.remoteAddress || "unknown",
       userAgent: req.get("User-Agent"),
+      shippingInfo: shippingInfo || undefined,
     });
 
     await bid.save();

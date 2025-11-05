@@ -294,6 +294,15 @@ export interface IBid extends Document {
   timestamp: Date;
   ipAddress: string;
   userAgent?: string;
+  shippingInfo?: {
+    country: string;
+    street: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    phone: string;
+    email: string;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
