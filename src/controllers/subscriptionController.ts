@@ -401,7 +401,34 @@ export class SubscriptionController {
         });
       }
 
-      const { paymentMethodId, plan = "pro" } = req.body;
+      const { paymentMethodId, plan = "pro", couponCode } = req.body;
+
+      // Validate and get coupon if provided
+      let stripeCouponId: string | undefined;
+      if (couponCode) {
+        const { Coupon } = await import("../models/Coupon");
+        const coupon = await Coupon.findOne({
+          code: couponCode.toUpperCase(),
+          valid: true,
+        });
+
+        if (!coupon) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid coupon code",
+          });
+        }
+
+        // Check if coupon has expired
+        if (coupon.redeemBy && new Date(coupon.redeemBy) < new Date()) {
+          return res.status(400).json({
+            success: false,
+            message: "Coupon has expired",
+          });
+        }
+
+        stripeCouponId = coupon.stripeCouponId;
+      }
 
       // Always create new Stripe customer (no conditions)
       const customer = await StripeService.createCustomer({
@@ -429,6 +456,7 @@ export class SubscriptionController {
         paymentMethodId,
         trialPeriodDays: 0, // No trial for direct upgrades
         immediatePayment: true, // Process payment immediately
+        coupon: stripeCouponId,
       });
 
       // Check if subscription is incomplete (payment failed)
@@ -666,7 +694,34 @@ export class SubscriptionController {
         });
       }
 
-      const { paymentMethodId, plan = "pro" } = req.body;
+      const { paymentMethodId, plan = "pro", couponCode } = req.body;
+
+      // Validate and get coupon if provided
+      let stripeCouponId: string | undefined;
+      if (couponCode) {
+        const { Coupon } = await import("../models/Coupon");
+        const coupon = await Coupon.findOne({
+          code: couponCode.toUpperCase(),
+          valid: true,
+        });
+
+        if (!coupon) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid coupon code",
+          });
+        }
+
+        // Check if coupon has expired
+        if (coupon.redeemBy && new Date(coupon.redeemBy) < new Date()) {
+          return res.status(400).json({
+            success: false,
+            message: "Coupon has expired",
+          });
+        }
+
+        stripeCouponId = coupon.stripeCouponId;
+      }
 
       // Create Stripe customer if not exists
       let customerId = user.subscription?.stripeCustomerId;
@@ -708,6 +763,7 @@ export class SubscriptionController {
         priceId,
         paymentMethodId,
         trialPeriodDays: 7,
+        coupon: stripeCouponId,
       });
 
       // Update user with trial subscription info
@@ -716,7 +772,9 @@ export class SubscriptionController {
         {
           "subscription.stripeCustomerId": customerId,
           "subscription.stripeSubscriptionId": subscription.id,
-          "subscription.status": subscription.status,
+          "subscription.status": StripeService.mapSubscriptionStatus(
+            subscription.status
+          ),
           "subscription.plan": plan,
           "subscription.trialStart": new Date(),
           "subscription.trialEnd": subscription.trial_end

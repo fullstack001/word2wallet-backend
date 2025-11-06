@@ -46,6 +46,7 @@ export class StripeService {
     paymentMethodId: string;
     trialPeriodDays?: number;
     immediatePayment?: boolean;
+    coupon?: string; // Stripe coupon ID or code
   }): Promise<Stripe.Subscription> {
     const {
       customerId,
@@ -53,6 +54,7 @@ export class StripeService {
       paymentMethodId,
       trialPeriodDays = 0,
       immediatePayment = false,
+      coupon,
     } = params;
 
     const subscriptionParams: any = {
@@ -63,6 +65,11 @@ export class StripeService {
       payment_settings: { save_default_payment_method: "on_subscription" },
       expand: ["latest_invoice.payment_intent"],
     };
+
+    // Add coupon if provided
+    if (coupon) {
+      subscriptionParams.coupon = coupon;
+    }
 
     // For immediate payment (direct upgrades), use error_if_incomplete
     // For trials, use default_incomplete to allow trial without payment
@@ -248,5 +255,90 @@ export class StripeService {
     }
 
     return priceId;
+  }
+
+  /**
+   * Create a coupon in Stripe
+   */
+  static async createCoupon(params: {
+    id: string; // Coupon code
+    name: string;
+    percentOff?: number; // Percentage discount (0-100)
+    amountOff?: number; // Fixed amount in cents
+    currency?: string; // Required for fixed amount
+    duration: "once" | "repeating" | "forever";
+    durationInMonths?: number; // Required for repeating
+    maxRedemptions?: number;
+    redeemBy?: number; // Unix timestamp
+    metadata?: Record<string, string>;
+  }): Promise<Stripe.Coupon> {
+    const {
+      id,
+      name,
+      percentOff,
+      amountOff,
+      currency,
+      duration,
+      durationInMonths,
+      maxRedemptions,
+      redeemBy,
+      metadata,
+    } = params;
+
+    const couponParams: Stripe.CouponCreateParams = {
+      id,
+      name,
+      duration,
+    };
+
+    if (percentOff !== undefined) {
+      couponParams.percent_off = percentOff;
+    } else if (amountOff !== undefined) {
+      couponParams.amount_off = amountOff;
+      couponParams.currency = currency || "usd";
+    } else {
+      throw new Error("Either percentOff or amountOff must be provided");
+    }
+
+    if (duration === "repeating" && durationInMonths) {
+      couponParams.duration_in_months = durationInMonths;
+    }
+
+    if (maxRedemptions !== undefined) {
+      couponParams.max_redemptions = maxRedemptions;
+    }
+
+    if (redeemBy !== undefined) {
+      couponParams.redeem_by = redeemBy;
+    }
+
+    if (metadata) {
+      couponParams.metadata = metadata;
+    }
+
+    return await stripe.coupons.create(couponParams);
+  }
+
+  /**
+   * Retrieve a coupon from Stripe
+   */
+  static async getCoupon(couponId: string): Promise<Stripe.Coupon> {
+    return await stripe.coupons.retrieve(couponId);
+  }
+
+  /**
+   * Delete a coupon from Stripe
+   */
+  static async deleteCoupon(couponId: string): Promise<Stripe.DeletedCoupon> {
+    return await stripe.coupons.del(couponId);
+  }
+
+  /**
+   * List all coupons from Stripe
+   */
+  static async listCoupons(
+    params?: Stripe.CouponListParams
+  ): Promise<Stripe.ApiList<Stripe.Coupon>> {
+    return await stripe.coupons.list(params);
   }
 }

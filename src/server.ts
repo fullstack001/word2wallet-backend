@@ -49,6 +49,8 @@ import emailCampaignRoutes from "./routes/emailCampaignRoutes";
 import mediaRoutes from "./routes/media";
 // Blog routes
 import blogRoutes from "./routes/blogs";
+// Coupon routes
+import couponRoutes from "./routes/coupons";
 import { setWebSocketManager } from "./controllers/auctionController";
 
 // Load environment variables
@@ -214,6 +216,8 @@ app.use("/api/email-campaigns", emailCampaignRoutes);
 app.use("/api/media", mediaRoutes);
 // Blog routes
 app.use("/api/blogs", blogRoutes);
+// Coupon routes
+app.use("/api/coupons", couponRoutes);
 
 // Error handling middleware
 app.use(notFound);
