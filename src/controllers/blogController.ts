@@ -249,11 +249,7 @@ export class BlogController {
   /**
    * Get recent blogs
    */
-  static async getRecentBlogs(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ) {
+  static async getRecentBlogs(req: Request, res: Response, next: NextFunction) {
     try {
       const { limit = 5 } = req.query;
 
@@ -297,10 +293,27 @@ export class BlogController {
 
       // Sanitize HTML content
       const sanitizedContent = sanitizeHtml(content, {
-        allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img"]),
+        allowedTags: sanitizeHtml.defaults.allowedTags.concat([
+          "img",
+          "video",
+          "source",
+        ]),
         allowedAttributes: {
           ...sanitizeHtml.defaults.allowedAttributes,
           img: ["src", "alt", "width", "height"],
+          video: [
+            "src",
+            "controls",
+            "width",
+            "height",
+            "poster",
+            "preload",
+            "loop",
+            "muted",
+            "autoplay",
+            "playsinline",
+          ],
+          source: ["src", "type"],
         },
       });
 
@@ -320,7 +333,9 @@ export class BlogController {
         title,
         slug,
         content: sanitizedContent,
-        excerpt: excerpt || sanitizeHtml(content, { allowedTags: [] }).substring(0, 500),
+        excerpt:
+          excerpt ||
+          sanitizeHtml(content, { allowedTags: [] }).substring(0, 500),
         featuredImage,
         tags: tags || [],
         status: status || "draft",
@@ -369,10 +384,27 @@ export class BlogController {
       // Sanitize HTML content if provided
       if (content) {
         blog.content = sanitizeHtml(content, {
-          allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img"]),
+          allowedTags: sanitizeHtml.defaults.allowedTags.concat([
+            "img",
+            "video",
+            "source",
+          ]),
           allowedAttributes: {
             ...sanitizeHtml.defaults.allowedAttributes,
             img: ["src", "alt", "width", "height"],
+            video: [
+              "src",
+              "controls",
+              "width",
+              "height",
+              "poster",
+              "preload",
+              "loop",
+              "muted",
+              "autoplay",
+              "playsinline",
+            ],
+            source: ["src", "type"],
           },
         });
       }
@@ -452,11 +484,7 @@ export class BlogController {
   /**
    * Increment blog views
    */
-  static async incrementViews(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ) {
+  static async incrementViews(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
 
@@ -480,4 +508,3 @@ export class BlogController {
     }
   }
 }
-
