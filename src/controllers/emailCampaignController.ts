@@ -613,7 +613,7 @@ export class EmailCampaignController {
           ...link.toObject(),
           linkType: "delivery_link" as const,
           displayName: link.title,
-          url: link.url || `https://dev.wordtowallet.com/book/${link.slug}`,
+          url: link.url || `https://wordtowallet.com/book/${link.slug}`,
         })),
       ];
 

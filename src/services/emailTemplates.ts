@@ -289,7 +289,7 @@ You're receiving this email because you started a trial with Wortowallet.`;
         "📋 Payment Details:",
         this.createList([
           "<strong>Plan:</strong> Wortowallet Pro",
-          "<strong>Amount:</strong> $20.00/month",
+          "<strong>Amount:</strong> $19.99/month",
           `<strong>Next billing date:</strong> ${subscriptionEndDate.toLocaleDateString(
             "en-US",
             {
@@ -363,7 +363,7 @@ You're receiving this email because you started a trial with Wortowallet.`;
         this.createList([
           "<strong>Plan:</strong> Wortowallet Pro",
           "<strong>Status:</strong> Active",
-          "<strong>Amount:</strong> $20.00/month",
+          "<strong>Amount:</strong> $19.99/month",
           `<strong>Next billing date:</strong> ${subscriptionEndDate.toLocaleDateString(
             "en-US",
             {
