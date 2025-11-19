@@ -1,7 +1,7 @@
 const axios = require("axios");
 
 // Test configuration
-const BASE_URL = "http://localhost:5000/api";
+const BASE_URL = process.env.API_URL || "http://127.0.0.1:5000/api";
 const TEST_USER = {
   email: "test@example.com",
   password: "testpassword123",
@@ -16,7 +16,7 @@ async function testEmailCampaigns() {
     // Step 1: Login to get auth token
     console.log("1. Logging in...");
     const loginResponse = await axios.post(`${BASE_URL}/auth/login`, TEST_USER);
-    authToken = loginResponse.data.data.token;
+    authToken = loginResponse.data.data.tokens.accessToken;
     console.log("✅ Login successful\n");
 
     // Step 2: Test getting user books
@@ -99,7 +99,26 @@ async function testEmailCampaigns() {
 
     console.log("🎉 All email campaign tests passed!");
   } catch (error) {
-    console.error("❌ Test failed:", error.response?.data || error.message);
+    const errorCode = error.code || error.cause?.code || "";
+    const errorMsg = error.message || String(error);
+    const isConnectionError = 
+      errorCode === "ECONNREFUSED" ||
+      errorCode === "EACCES" ||
+      errorCode === "ENOTFOUND" ||
+      errorMsg.includes("EACCES") ||
+      errorMsg.includes("ECONNREFUSED") ||
+      errorMsg.includes("connect") ||
+      errorMsg.includes("network") ||
+      (error.response === undefined && error.request !== undefined);
+    
+    if (isConnectionError) {
+      console.error("❌ Test failed: Cannot connect to backend server!");
+      console.error(`   Error: ${errorMsg}`);
+      console.error("   Please ensure the server is running on port 5000:");
+      console.error("   npm run dev");
+    } else {
+      console.error("❌ Test failed:", error.response?.data || errorMsg);
+    }
     process.exit(1);
   }
 }

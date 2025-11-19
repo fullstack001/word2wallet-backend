@@ -8,9 +8,10 @@
 const axios = require("axios");
 
 // Configuration
-const API_BASE_URL = process.env.API_URL || "http://localhost:5000/api";
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@example.com";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
+const API_BASE_URL = process.env.API_URL || "http://127.0.0.1:5000/api";
+// Default admin credentials match server defaults (from createAdminUser.ts)
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@word2wallet.com";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123456";
 
 let authToken = "";
 
@@ -68,12 +69,38 @@ const login = async () => {
       password: ADMIN_PASSWORD,
     });
 
-    authToken = response.data.token;
+    authToken = response.data.data.tokens.accessToken;
     log("✓ Login successful", "green");
     return true;
   } catch (error) {
     log("✗ Login failed", "red");
-    log(`Error: ${error.response?.data?.message || error.message}`, "red");
+    const errorCode = error.code || error.cause?.code || "";
+    const errorMsg = error.message || String(error);
+    const isConnectionError = 
+      errorCode === "ECONNREFUSED" ||
+      errorCode === "EACCES" ||
+      errorCode === "ENOTFOUND" ||
+      errorMsg.includes("EACCES") ||
+      errorMsg.includes("ECONNREFUSED") ||
+      errorMsg.includes("connect") ||
+      errorMsg.includes("network") ||
+      (error.response === undefined && error.request !== undefined);
+    
+    if (isConnectionError) {
+      log("Error: Cannot connect to backend server!", "red");
+      log(`   Error: ${errorMsg}`, "red");
+      log("   Please ensure the server is running on port 5000:", "yellow");
+      log("   npm run dev", "yellow");
+    } else {
+      const errorMessage = error.response?.data?.message || errorMsg;
+      log(`Error: ${errorMessage}`, "red");
+      if (errorMessage.includes("Invalid email or password")) {
+        log("", "yellow");
+        log("💡 Tip: Set ADMIN_EMAIL and ADMIN_PASSWORD environment variables", "yellow");
+        log(`   Current: ${ADMIN_EMAIL} / ${"*".repeat(ADMIN_PASSWORD.length)}`, "yellow");
+        log("   Or ensure admin user exists with matching credentials", "yellow");
+      }
+    }
     return false;
   }
 };
@@ -281,9 +308,28 @@ const main = async () => {
     await runTests();
   } catch (error) {
     log("\n✗ Test suite failed with error:", "red");
-    log(error.message, "red");
-    if (error.response) {
-      log(JSON.stringify(error.response.data, null, 2), "yellow");
+    const errorCode = error.code || error.cause?.code || "";
+    const errorMsg = error.message || String(error);
+    const isConnectionError = 
+      errorCode === "ECONNREFUSED" ||
+      errorCode === "EACCES" ||
+      errorCode === "ENOTFOUND" ||
+      errorMsg.includes("EACCES") ||
+      errorMsg.includes("ECONNREFUSED") ||
+      errorMsg.includes("connect") ||
+      errorMsg.includes("network") ||
+      (error.response === undefined && error.request !== undefined);
+    
+    if (isConnectionError) {
+      log("Cannot connect to backend server!", "red");
+      log(`   Error: ${errorMsg}`, "red");
+      log("   Please ensure the server is running on port 5000:", "yellow");
+      log("   npm run dev", "yellow");
+    } else {
+      log(errorMsg, "red");
+      if (error.response) {
+        log(JSON.stringify(error.response.data, null, 2), "yellow");
+      }
     }
     process.exit(1);
   }

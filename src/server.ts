@@ -51,6 +51,8 @@ import mediaRoutes from "./routes/media";
 import blogRoutes from "./routes/blogs";
 // Coupon routes
 import couponRoutes from "./routes/coupons";
+// Contact routes
+import contactRoutes from "./routes/contactRoutes";
 import { setWebSocketManager } from "./controllers/auctionController";
 
 // Load environment variables
@@ -218,6 +220,8 @@ app.use("/api/media", mediaRoutes);
 app.use("/api/blogs", blogRoutes);
 // Coupon routes
 app.use("/api/coupons", couponRoutes);
+// Contact routes
+app.use("/api/contact", contactRoutes);
 
 // Error handling middleware
 app.use(notFound);
