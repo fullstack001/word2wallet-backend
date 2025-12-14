@@ -64,8 +64,26 @@ export const updateCourseValidation = [
     .withMessage("Valid subject ID is required"),
   body("chapters")
     .optional()
-    .isArray({ min: 1 })
-    .withMessage("At least one chapter is required"),
+    .customSanitizer((value) => {
+      // Accept JSON strings from FormData and convert to array for downstream validators
+      if (typeof value === "string") {
+        try {
+          return JSON.parse(value);
+        } catch (err) {
+          return value;
+        }
+      }
+      return value;
+    })
+    .custom((value) => {
+      if (!Array.isArray(value)) {
+        throw new Error("Chapters must be an array");
+      }
+      if (value.length === 0) {
+        throw new Error("At least one chapter is required");
+      }
+      return true;
+    }),
   body("chapters.*.title")
     .optional()
     .trim()

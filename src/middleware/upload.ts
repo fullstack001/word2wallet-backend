@@ -219,7 +219,7 @@ export const uploadCourseContent = multer({
       let subPath = "";
 
       // Determine subdirectory based on fieldname
-      if (file.fieldname === "cover") {
+      if (file.fieldname === "cover" || file.fieldname === "epubCover") {
         subPath = "covers";
       } else if (file.fieldname === "audio") {
         subPath = "audio";
@@ -244,6 +244,7 @@ export const uploadCourseContent = multer({
   ) => {
     const allowedMimes: { [key: string]: string[] } = {
       cover: ["image/jpeg", "image/jpg", "image/png", "image/webp"],
+      epubCover: ["image/jpeg", "image/jpg", "image/png", "image/webp"],
       audio: [
         "audio/mpeg",
         "audio/mp3",
