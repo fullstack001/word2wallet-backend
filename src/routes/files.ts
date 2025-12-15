@@ -1,61 +1,38 @@
-import { Router, Response } from "express";
-import path from "path";
-import fs from "fs";
-import { getLocalStorageService } from "../services/localStorageService";
+import { Router } from "express";
+import { getStorageService } from "../services/storageService";
 
 const router = Router();
 
 /**
- * Serve files from local storage
+ * Serve files from GCS storage
+ * Redirects to signed URL or streams file from GCS
  */
-router.get("/:filename", async (req, res): Promise<Response> => {
+router.get("/:filename", async (req, res): Promise<void> => {
   try {
     const { filename } = req.params;
-    const storageService = getLocalStorageService();
+    const storageService = getStorageService();
 
     // Check if file exists
     const exists = await storageService.fileExists(filename);
     if (!exists) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         message: "File not found",
       });
+      return;
     }
 
-    // Get file metadata
-    const metadata = await storageService.getFileMetadata(filename);
-
-    // Set appropriate headers with CORS
-    if (metadata.contentType) {
-      res.setHeader("Content-Type", metadata.contentType);
-    }
-    res.setHeader("Content-Length", metadata.size.toString());
-    res.setHeader("Last-Modified", metadata.lastModified.toUTCString());
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Cache-Control", "public, max-age=31536000");
-
-    // Stream the file
-    const filePath = path.join(
-      process.env.UPLOAD_PATH || "./uploads",
-      filename
+    // Generate signed URL for download (valid for 1 hour)
+    const signedUrl = await storageService.generatePresignedDownloadUrl(
+      filename,
+      3600
     );
-    const fileStream = fs.createReadStream(filePath);
 
-    fileStream.on("error", (error) => {
-      console.error("File stream error:", error);
-      if (!res.headersSent) {
-        res.status(500).json({
-          success: false,
-          message: "Error reading file",
-        });
-      }
-    });
-
-    fileStream.pipe(res);
-    return res; // Return the response object
+    // Redirect to signed URL
+    res.redirect(signedUrl);
   } catch (error) {
     console.error("File serve error:", error);
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       message: "Error serving file",
       error: error instanceof Error ? error.message : "Unknown error",
@@ -66,7 +43,7 @@ router.get("/:filename", async (req, res): Promise<Response> => {
 /**
  * Upload file endpoint (for presigned URL compatibility)
  */
-router.put("/upload/:filename", async (req, res): Promise<Response> => {
+router.put("/upload/:filename", async (req, res): Promise<void> => {
   try {
     const { filename } = req.params;
     const contentType =
@@ -75,7 +52,7 @@ router.put("/upload/:filename", async (req, res): Promise<Response> => {
     // Get file buffer from request
     const chunks: Buffer[] = [];
 
-    return new Promise<Response>((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       req.on("data", (chunk) => {
         chunks.push(chunk);
       });
@@ -83,47 +60,52 @@ router.put("/upload/:filename", async (req, res): Promise<Response> => {
       req.on("end", async () => {
         try {
           const fileBuffer = Buffer.concat(chunks);
-          const storageService = getLocalStorageService();
+          const storageService = getStorageService();
 
-          await storageService.uploadFile(filename, fileBuffer, contentType, {
-            uploadedAt: new Date().toISOString(),
+          const uploadResult = await storageService.uploadFile(
+            filename,
+            fileBuffer,
             contentType,
-          });
+            {
+              uploadedAt: new Date().toISOString(),
+              contentType,
+            }
+          );
 
-          const response = res.json({
+          res.json({
             success: true,
             message: "File uploaded successfully",
             data: {
-              key: filename,
-              url: storageService.getPublicUrl(filename),
+              key: uploadResult.key,
+              url: uploadResult.url,
               size: fileBuffer.length,
             },
           });
-          resolve(response);
+          resolve();
         } catch (error) {
           console.error("Upload error:", error);
-          const response = res.status(500).json({
+          res.status(500).json({
             success: false,
             message: "Error uploading file",
             error: error instanceof Error ? error.message : "Unknown error",
           });
-          resolve(response);
+          resolve();
         }
       });
 
       req.on("error", (error) => {
         console.error("Request error:", error);
-        const response = res.status(500).json({
+        res.status(500).json({
           success: false,
           message: "Error processing upload",
           error: error.message,
         });
-        resolve(response);
+        resolve();
       });
     });
   } catch (error) {
     console.error("Upload endpoint error:", error);
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       message: "Error in upload endpoint",
       error: error instanceof Error ? error.message : "Unknown error",

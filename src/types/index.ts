@@ -391,7 +391,7 @@ export interface IBook extends Document {
   audioQuality?: string; // Audio quality for distribution
 
   // Cover image fields (only 1 allowed)
-  coverImageKey?: string; // S3 key for cover image
+  coverImageKey?: string; // GCS key for cover image
   coverImageName?: string; // Original cover image filename
   coverImageSize?: number; // Cover image file size
 

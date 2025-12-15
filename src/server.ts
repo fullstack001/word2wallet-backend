@@ -173,8 +173,8 @@ if (process.env.NODE_ENV === "development") {
   app.use(morgan("combined"));
 }
 
-// Static files
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+// Static files - removed, using GCS for file storage
+// app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // Health check endpoint
 app.get("/health", (req, res) => {

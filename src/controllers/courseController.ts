@@ -5,8 +5,10 @@ import { Subject } from "../models/Subject";
 import { CustomError } from "../middleware/errorHandler";
 import { AuthRequest, CourseQuery, IChapter } from "../types";
 import { EpubGenerator } from "../utils/epubGenerator";
+import { getStorageService } from "../services/storageService";
 import fs from "fs";
 import path from "path";
+import os from "os";
 
 export class CourseController {
   /**
@@ -230,7 +232,9 @@ export class CourseController {
       }
 
       // Handle cover image upload if present
-      let coverImagePath = null;
+      let coverImageKey: string | null = null;
+      const storageService = getStorageService();
+
       if (
         req.files &&
         typeof req.files === "object" &&
@@ -238,7 +242,19 @@ export class CourseController {
         req.files.cover &&
         req.files.cover[0]
       ) {
-        coverImagePath = req.files.cover[0].path;
+        const coverFile = req.files.cover[0];
+        if (coverFile.buffer) {
+          const uploadResult = await storageService.uploadFile(
+            `covers/${user._id}/${Date.now()}-${coverFile.originalname}`,
+            coverFile.buffer,
+            coverFile.mimetype,
+            {
+              uploadedAt: new Date().toISOString(),
+              originalName: coverFile.originalname,
+            }
+          );
+          coverImageKey = uploadResult.key;
+        }
       }
 
       // Handle multimedia files if present
@@ -248,26 +264,43 @@ export class CourseController {
           ? req.files
           : Object.values(req.files).flat();
 
-        files.forEach((file: any) => {
-          const fileData = {
-            id: `${file.fieldname}-${Date.now()}-${Math.random()
-              .toString(36)
-              .substr(2, 9)}`,
-            filename: file.filename,
-            originalName: file.originalname,
-            mimeType: file.mimetype,
-            size: file.size,
-            path: file.path,
-            url: `/uploads/${file.fieldname}/${file.filename}`,
-            uploadedAt: new Date(),
-          };
+        for (const file of files) {
+          if (file.fieldname === "audio" || file.fieldname === "video") {
+            if (file.buffer) {
+              const uploadResult = await storageService.uploadFile(
+                `${file.fieldname}/${user._id}/${Date.now()}-${
+                  file.originalname
+                }`,
+                file.buffer,
+                file.mimetype,
+                {
+                  uploadedAt: new Date().toISOString(),
+                  originalName: file.originalname,
+                }
+              );
 
-          if (file.fieldname === "audio") {
-            multimediaFiles.audio.push(fileData);
-          } else if (file.fieldname === "video") {
-            multimediaFiles.video.push(fileData);
+              const fileData = {
+                id: `${file.fieldname}-${Date.now()}-${Math.random()
+                  .toString(36)
+                  .substr(2, 9)}`,
+                filename:
+                  uploadResult.key.split("/").pop() || file.originalname,
+                originalName: file.originalname,
+                mimeType: file.mimetype,
+                size: file.size,
+                path: uploadResult.key,
+                url: uploadResult.url,
+                uploadedAt: new Date(),
+              };
+
+              if (file.fieldname === "audio") {
+                multimediaFiles.audio.push(fileData);
+              } else if (file.fieldname === "video") {
+                multimediaFiles.video.push(fileData);
+              }
+            }
           }
-        });
+        }
       }
 
       // Verify subject exists
@@ -297,7 +330,7 @@ export class CourseController {
         description,
         subject,
         chapters: parsedChapters,
-        epubCover: coverImagePath,
+        epubCover: coverImageKey,
         multimediaContent: multimediaFiles,
         isPublished: isPublished || false,
         isActive: isActive !== undefined ? isActive : true,
@@ -318,35 +351,72 @@ export class CourseController {
 
       // Generate EPUB file
       try {
-        const epubPath = path.join(
-          process.cwd(),
-          "uploads",
-          "epubs",
-          `${course._id}.epub`
+        // Create temporary file for EPUB generation
+        const tempEpubPath = path.join(
+          os.tmpdir(),
+          `epub-${course._id}-${Date.now()}.epub`
         );
+
+        // Download cover image if needed for EPUB generation
+        let coverImagePath: string | null = null;
+        if (coverImageKey) {
+          try {
+            const coverBuffer = await storageService.downloadFile(
+              coverImageKey
+            );
+            coverImagePath = path.join(
+              os.tmpdir(),
+              `cover-${course._id}-${Date.now()}.jpg`
+            );
+            fs.writeFileSync(coverImagePath, coverBuffer);
+          } catch (error) {
+            console.warn("Failed to download cover for EPUB:", error);
+          }
+        }
 
         await EpubGenerator.generateEpub({
           title: course.title,
           description: course.description,
           author: `${user.firstName} ${user.lastName}`,
-          coverImagePath: course.epubCover,
+          coverImagePath: coverImagePath || undefined,
           chapters: course.chapters,
-          outputPath: epubPath,
+          outputPath: tempEpubPath,
         });
 
-        // Update course with EPUB file path
-        course.epubFile = `uploads/epubs/${course._id}.epub`;
+        // Upload EPUB to GCS
+        const epubBuffer = fs.readFileSync(tempEpubPath);
+        const epubUploadResult = await storageService.uploadFile(
+          `epubs/${course._id}.epub`,
+          epubBuffer,
+          "application/epub+zip",
+          {
+            courseId: course._id.toString(),
+            title: course.title,
+            uploadedAt: new Date().toISOString(),
+          }
+        );
+
+        // Update course with EPUB file key
+        course.epubFile = epubUploadResult.key;
         course.epubMetadata = {
           title: course.title,
           creator: `${user.firstName} ${user.lastName}`,
           language: "en",
           description: course.description,
-          coverImage: course.epubCover,
-          fileSize: fs.existsSync(epubPath) ? fs.statSync(epubPath).size : 0,
+          coverImage: coverImageKey || undefined,
+          fileSize: epubBuffer.length,
           lastModified: new Date(),
         };
 
         await course.save();
+
+        // Clean up temporary files
+        if (fs.existsSync(tempEpubPath)) {
+          fs.unlinkSync(tempEpubPath);
+        }
+        if (coverImagePath && fs.existsSync(coverImagePath)) {
+          fs.unlinkSync(coverImagePath);
+        }
       } catch (epubError) {
         console.error("EPUB generation failed:", epubError);
         // Continue without EPUB file - it can be generated later
@@ -486,19 +556,22 @@ export class CourseController {
         }
       }
 
+      const storageService = getStorageService();
+
       // Handle cover image upload if present
-      let coverImagePath: string | undefined = course.epubCover;
+      let coverImageKey: string | undefined = course.epubCover;
 
       // Check if existing cover should be removed
       if (removeExistingCover === "true" || removeExistingCover === true) {
-        if (
-          course.epubCover &&
-          fs.existsSync(path.join(process.cwd(), course.epubCover))
-        ) {
-          fs.unlinkSync(path.join(process.cwd(), course.epubCover));
-          console.log("🗑️ Removed existing cover image:", course.epubCover);
+        if (course.epubCover) {
+          try {
+            await storageService.deleteFile(course.epubCover);
+            console.log("🗑️ Removed existing cover image:", course.epubCover);
+          } catch (error) {
+            console.error("Failed to delete cover from GCS:", error);
+          }
         }
-        coverImagePath = undefined;
+        coverImageKey = undefined;
       }
 
       // Handle new cover image upload
@@ -509,15 +582,31 @@ export class CourseController {
         req.files.epubCover &&
         req.files.epubCover[0]
       ) {
+        const coverFile = req.files.epubCover[0];
         // Delete old cover if exists
-        if (
-          course.epubCover &&
-          fs.existsSync(path.join(process.cwd(), course.epubCover))
-        ) {
-          fs.unlinkSync(path.join(process.cwd(), course.epubCover));
+        if (course.epubCover) {
+          try {
+            await storageService.deleteFile(course.epubCover);
+          } catch (error) {
+            console.error("Failed to delete old cover:", error);
+          }
         }
-        coverImagePath = req.files.epubCover[0].path;
-        console.log("📸 Cover image updated:", coverImagePath);
+        // Upload new cover
+        if (coverFile.buffer) {
+          const uploadResult = await storageService.uploadFile(
+            `covers/${course.createdBy}/${Date.now()}-${
+              coverFile.originalname
+            }`,
+            coverFile.buffer,
+            coverFile.mimetype,
+            {
+              uploadedAt: new Date().toISOString(),
+              originalName: coverFile.originalname,
+            }
+          );
+          coverImageKey = uploadResult.key;
+          console.log("📸 Cover image updated:", coverImageKey);
+        }
       }
 
       // Handle new multimedia files if present
@@ -527,26 +616,43 @@ export class CourseController {
           ? req.files
           : Object.values(req.files).flat();
 
-        files.forEach((file: any) => {
-          const fileData = {
-            id: `${file.fieldname}-${Date.now()}-${Math.random()
-              .toString(36)
-              .substr(2, 9)}`,
-            filename: file.filename,
-            originalName: file.originalname,
-            mimeType: file.mimetype,
-            size: file.size,
-            path: file.path,
-            url: `/uploads/${file.fieldname}/${file.filename}`,
-            uploadedAt: new Date(),
-          };
+        for (const file of files) {
+          if (
+            (file.fieldname === "audio" || file.fieldname === "video") &&
+            file.buffer
+          ) {
+            const uploadResult = await storageService.uploadFile(
+              `${file.fieldname}/${course.createdBy}/${Date.now()}-${
+                file.originalname
+              }`,
+              file.buffer,
+              file.mimetype,
+              {
+                uploadedAt: new Date().toISOString(),
+                originalName: file.originalname,
+              }
+            );
 
-          if (file.fieldname === "audio") {
-            newMultimediaFiles.audio.push(fileData);
-          } else if (file.fieldname === "video") {
-            newMultimediaFiles.video.push(fileData);
+            const fileData = {
+              id: `${file.fieldname}-${Date.now()}-${Math.random()
+                .toString(36)
+                .substr(2, 9)}`,
+              filename: uploadResult.key.split("/").pop() || file.originalname,
+              originalName: file.originalname,
+              mimeType: file.mimetype,
+              size: file.size,
+              path: uploadResult.key,
+              url: uploadResult.url,
+              uploadedAt: new Date(),
+            };
+
+            if (file.fieldname === "audio") {
+              newMultimediaFiles.audio.push(fileData);
+            } else if (file.fieldname === "video") {
+              newMultimediaFiles.video.push(fileData);
+            }
           }
-        });
+        }
       }
 
       // Merge existing multimedia content with new files
@@ -575,8 +681,7 @@ export class CourseController {
       if (subject) updates.subject = subject;
       if (parsedChapters && parsedChapters !== course.chapters)
         updates.chapters = parsedChapters;
-      if (coverImagePath !== course.epubCover)
-        updates.epubCover = coverImagePath;
+      if (coverImageKey !== course.epubCover) updates.epubCover = coverImageKey;
       if (finalMultimediaContent !== course.multimediaContent)
         updates.multimediaContent = finalMultimediaContent;
       if (isPublished !== undefined) updates.isPublished = isPublished;
@@ -605,21 +710,44 @@ export class CourseController {
         title ||
         description ||
         (parsedChapters && parsedChapters !== course.chapters) ||
-        coverImagePath !== course.epubCover ||
+        coverImageKey !== course.epubCover ||
         removeExistingCover;
       if (contentChanged) {
         try {
-          const epubPath = path.join(
-            process.cwd(),
-            "uploads",
-            "epubs",
-            `${updatedCourse._id}.epub`
+          // Delete old EPUB file from GCS if exists
+          if (updatedCourse.epubFile) {
+            try {
+              await storageService.deleteFile(updatedCourse.epubFile);
+              console.log(
+                "🗑️ Deleted old EPUB file from GCS:",
+                updatedCourse.epubFile
+              );
+            } catch (error) {
+              console.error("Failed to delete old EPUB:", error);
+            }
+          }
+
+          // Create temporary file for EPUB generation
+          const tempEpubPath = path.join(
+            os.tmpdir(),
+            `epub-${updatedCourse._id}-${Date.now()}.epub`
           );
 
-          // Delete old EPUB file if exists
-          if (fs.existsSync(epubPath)) {
-            fs.unlinkSync(epubPath);
-            console.log("🗑️ Deleted old EPUB file:", epubPath);
+          // Download cover image if needed for EPUB generation
+          let coverImagePath: string | null = null;
+          if (coverImageKey) {
+            try {
+              const coverBuffer = await storageService.downloadFile(
+                coverImageKey
+              );
+              coverImagePath = path.join(
+                os.tmpdir(),
+                `cover-${updatedCourse._id}-${Date.now()}.jpg`
+              );
+              fs.writeFileSync(coverImagePath, coverBuffer);
+            } catch (error) {
+              console.warn("Failed to download cover for EPUB:", error);
+            }
           }
 
           const authorName =
@@ -635,25 +763,46 @@ export class CourseController {
             title: updatedCourse.title,
             description: updatedCourse.description,
             author: authorName,
-            coverImagePath: updatedCourse.epubCover,
+            coverImagePath: coverImagePath || undefined,
             chapters: updatedCourse.chapters,
-            outputPath: epubPath,
+            outputPath: tempEpubPath,
           });
 
+          // Upload EPUB to GCS
+          const epubBuffer = fs.readFileSync(tempEpubPath);
+          const epubUploadResult = await storageService.uploadFile(
+            `epubs/${updatedCourse._id}.epub`,
+            epubBuffer,
+            "application/epub+zip",
+            {
+              courseId: updatedCourse._id.toString(),
+              title: updatedCourse.title,
+              uploadedAt: new Date().toISOString(),
+            }
+          );
+
           // Update EPUB metadata
-          updatedCourse.epubFile = `uploads/epubs/${updatedCourse._id}.epub`;
+          updatedCourse.epubFile = epubUploadResult.key;
           updatedCourse.epubMetadata = {
             title: updatedCourse.title,
             creator: authorName,
             language: "en",
             description: updatedCourse.description,
-            coverImage: updatedCourse.epubCover,
-            fileSize: fs.existsSync(epubPath) ? fs.statSync(epubPath).size : 0,
+            coverImage: coverImageKey || undefined,
+            fileSize: epubBuffer.length,
             lastModified: new Date(),
           };
 
           await updatedCourse.save();
           console.log("✅ EPUB regenerated successfully");
+
+          // Clean up temporary files
+          if (fs.existsSync(tempEpubPath)) {
+            fs.unlinkSync(tempEpubPath);
+          }
+          if (coverImagePath && fs.existsSync(coverImagePath)) {
+            fs.unlinkSync(coverImagePath);
+          }
         } catch (epubError) {
           console.error("❌ EPUB regeneration failed:", epubError);
           // Continue without regenerating EPUB
@@ -672,6 +821,7 @@ export class CourseController {
 
   /**
    * Serve EPUB file for reading (not download)
+   * Redirects to GCS signed URL
    */
   static async serveEpub(req: Request, res: Response, next: NextFunction) {
     try {
@@ -685,78 +835,24 @@ export class CourseController {
         });
       }
 
-      const filePath = path.join(process.cwd(), course.epubFile);
+      const storageService = getStorageService();
+      const exists = await storageService.fileExists(course.epubFile);
 
-      if (!fs.existsSync(filePath)) {
+      if (!exists) {
         return res.status(404).json({
           success: false,
-          message: "EPUB file not found on server",
+          message: "EPUB file not found in storage",
         });
       }
 
-      // Get file stats for proper headers
-      const stats = fs.statSync(filePath);
-      const fileSize = stats.size;
+      // Generate signed URL (valid for 1 hour)
+      const signedUrl = await storageService.generatePresignedDownloadUrl(
+        course.epubFile,
+        3600
+      );
 
-      // Handle range requests for epubjs
-      const range = req.headers.range;
-      if (range) {
-        const parts = range.replace(/bytes=/, "").split("-");
-        const start = parseInt(parts[0], 10);
-        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-        const chunksize = end - start + 1;
-
-        res.status(206);
-        res.setHeader("Content-Range", `bytes ${start}-${end}/${fileSize}`);
-        res.setHeader("Accept-Ranges", "bytes");
-        res.setHeader("Content-Length", chunksize);
-        res.setHeader("Content-Type", "application/epub+zip");
-        res.setHeader("Cache-Control", "public, max-age=3600");
-        res.setHeader("Access-Control-Allow-Origin", "*");
-        res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-        res.setHeader(
-          "Access-Control-Allow-Headers",
-          "Range, Content-Type, Accept"
-        );
-
-        const fileStream = fs.createReadStream(filePath, { start, end });
-        fileStream.pipe(res);
-
-        fileStream.on("error", (error) => {
-          console.error("Error streaming EPUB file range:", error);
-          if (!res.headersSent) {
-            res.status(500).json({
-              success: false,
-              message: "Error reading EPUB file",
-            });
-          }
-        });
-      } else {
-        // Full file request
-        res.setHeader("Content-Type", "application/epub+zip");
-        res.setHeader("Content-Length", fileSize);
-        res.setHeader("Accept-Ranges", "bytes");
-        res.setHeader("Cache-Control", "public, max-age=3600");
-        res.setHeader("Access-Control-Allow-Origin", "*");
-        res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-        res.setHeader(
-          "Access-Control-Allow-Headers",
-          "Range, Content-Type, Accept"
-        );
-
-        const fileStream = fs.createReadStream(filePath);
-        fileStream.pipe(res);
-
-        fileStream.on("error", (error) => {
-          console.error("Error streaming EPUB file:", error);
-          if (!res.headersSent) {
-            res.status(500).json({
-              success: false,
-              message: "Error reading EPUB file",
-            });
-          }
-        });
-      }
+      // Redirect to signed URL
+      return res.redirect(signedUrl);
     } catch (error) {
       return next(error);
     }
@@ -764,6 +860,7 @@ export class CourseController {
 
   /**
    * Download EPUB file
+   * Redirects to GCS signed URL
    */
   static async downloadEpub(req: Request, res: Response, next: NextFunction) {
     try {
@@ -777,19 +874,24 @@ export class CourseController {
         });
       }
 
-      const filePath = path.join(process.cwd(), course.epubFile);
+      const storageService = getStorageService();
+      const exists = await storageService.fileExists(course.epubFile);
 
-      if (!fs.existsSync(filePath)) {
+      if (!exists) {
         return res.status(404).json({
           success: false,
-          message: "EPUB file not found on server",
+          message: "EPUB file not found in storage",
         });
       }
 
-      res.download(
-        filePath,
-        `${course.title.replace(/[^a-zA-Z0-9]/g, "_")}.epub`
+      // Generate signed URL with download disposition (valid for 1 hour)
+      const signedUrl = await storageService.generatePresignedDownloadUrl(
+        course.epubFile,
+        3600
       );
+
+      // Redirect to signed URL
+      return res.redirect(signedUrl);
     } catch (error) {
       return next(error);
     }
@@ -814,38 +916,48 @@ export class CourseController {
         });
       }
 
-      // Delete associated files
+      // Delete associated files from GCS
+      const storageService = getStorageService();
+
       if (course.epubFile) {
-        const epubPath = path.join(process.cwd(), course.epubFile);
-        if (fs.existsSync(epubPath)) {
-          fs.unlinkSync(epubPath);
+        try {
+          await storageService.deleteFile(course.epubFile);
+        } catch (error) {
+          console.error("Failed to delete EPUB from GCS:", error);
         }
       }
 
       if (course.epubCover) {
-        const coverPath = path.join(process.cwd(), course.epubCover);
-        if (fs.existsSync(coverPath)) {
-          fs.unlinkSync(coverPath);
+        try {
+          await storageService.deleteFile(course.epubCover);
+        } catch (error) {
+          console.error("Failed to delete cover from GCS:", error);
         }
       }
 
-      // Delete multimedia files
+      // Delete multimedia files from GCS
       if (course.multimediaContent) {
         // Delete audio files
-        course.multimediaContent.audio.forEach((audioFile) => {
-          const audioPath = path.join(process.cwd(), audioFile.path);
-          if (fs.existsSync(audioPath)) {
-            fs.unlinkSync(audioPath);
+        for (const audioFile of course.multimediaContent.audio) {
+          if (audioFile.path) {
+            try {
+              await storageService.deleteFile(audioFile.path);
+            } catch (error) {
+              console.error("Failed to delete audio file from GCS:", error);
+            }
           }
-        });
+        }
 
         // Delete video files
-        course.multimediaContent.video.forEach((videoFile) => {
-          const videoPath = path.join(process.cwd(), videoFile.path);
-          if (fs.existsSync(videoPath)) {
-            fs.unlinkSync(videoPath);
+        for (const videoFile of course.multimediaContent.video) {
+          if (videoFile.path) {
+            try {
+              await storageService.deleteFile(videoFile.path);
+            } catch (error) {
+              console.error("Failed to delete video file from GCS:", error);
+            }
           }
-        });
+        }
       }
 
       await Course.findByIdAndDelete(id);
@@ -921,9 +1033,14 @@ export class CourseController {
         });
       }
 
-      // Delete the physical file
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
+      // Delete the file from GCS
+      if (filePath) {
+        try {
+          const storageService = getStorageService();
+          await storageService.deleteFile(filePath);
+        } catch (error) {
+          console.error("Failed to delete file from GCS:", error);
+        }
       }
 
       await course.save();
@@ -1003,39 +1120,25 @@ export class CourseController {
         });
       }
 
-      const filePath = path.join(process.cwd(), fileToServe.path);
+      // Generate signed URL for the file
+      const storageService = getStorageService();
+      const exists = await storageService.fileExists(fileToServe.path);
 
-      if (!fs.existsSync(filePath)) {
+      if (!exists) {
         return res.status(404).json({
           success: false,
-          message: "File not found on server",
+          message: "File not found in storage",
         });
       }
 
-      // Set appropriate headers
-      res.setHeader("Content-Type", fileToServe.mimeType);
-      res.setHeader("Content-Length", fileToServe.size);
-      res.setHeader(
-        "Content-Disposition",
-        `inline; filename="${fileToServe.originalName}"`
+      // Generate signed URL (valid for 1 hour)
+      const signedUrl = await storageService.generatePresignedDownloadUrl(
+        fileToServe.path,
+        3600
       );
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.setHeader("Access-Control-Allow-Methods", "GET");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-      // Stream the file
-      const fileStream = fs.createReadStream(filePath);
-      fileStream.pipe(res);
-
-      fileStream.on("error", (error) => {
-        console.error("Error streaming file:", error);
-        if (!res.headersSent) {
-          res.status(500).json({
-            success: false,
-            message: "Error serving file",
-          });
-        }
-      });
+      // Redirect to signed URL
+      return res.redirect(signedUrl);
     } catch (error) {
       return next(error);
     }
@@ -1070,43 +1173,25 @@ export class CourseController {
         });
       }
 
-      const coverPath = path.join(process.cwd(), course.epubCover);
+      // Generate signed URL for the cover image
+      const storageService = getStorageService();
+      const exists = await storageService.fileExists(course.epubCover);
 
-      if (!fs.existsSync(coverPath)) {
+      if (!exists) {
         return res.status(404).json({
           success: false,
-          message: "Cover image file not found on server",
+          message: "Cover image not found in storage",
         });
       }
 
-      // Set appropriate headers
-      const ext = path.extname(course.epubCover).toLowerCase();
-      const mimeType =
-        ext === ".jpg" || ext === ".jpeg"
-          ? "image/jpeg"
-          : ext === ".png"
-          ? "image/png"
-          : "image/jpeg";
+      // Generate signed URL (valid for 1 hour)
+      const signedUrl = await storageService.generatePresignedDownloadUrl(
+        course.epubCover,
+        3600
+      );
 
-      res.setHeader("Content-Type", mimeType);
-      res.setHeader("Content-Disposition", `inline; filename="cover${ext}"`);
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.setHeader("Access-Control-Allow-Methods", "GET");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
-      // Stream the file
-      const fileStream = fs.createReadStream(coverPath);
-      fileStream.pipe(res);
-
-      fileStream.on("error", (error) => {
-        console.error("Error streaming cover image:", error);
-        if (!res.headersSent) {
-          res.status(500).json({
-            success: false,
-            message: "Error serving cover image",
-          });
-        }
-      });
+      // Redirect to signed URL
+      return res.redirect(signedUrl);
     } catch (error) {
       return next(error);
     }

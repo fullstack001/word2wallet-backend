@@ -25,7 +25,7 @@ export interface IBook {
   audioQuality?: string; // Audio quality for distribution
 
   // Cover image fields (only 1 allowed)
-  coverImageKey?: string; // S3 key for cover image
+  coverImageKey?: string; // GCS key for cover image
   coverImageName?: string; // Original cover image filename
   coverImageSize?: number; // Cover image file size
 
@@ -53,7 +53,7 @@ export interface IBook {
   };
 
   // Legacy fields for backward compatibility
-  fileKey?: string; // S3 key for the book file
+  fileKey?: string; // GCS key for the book file
   fileName?: string;
   fileSize?: number;
   fileType?: BookFileType; // EPUB, PDF, or AUDIO
@@ -403,7 +403,13 @@ bookSchema.virtual("fileUrl").get(function () {
     this.pdfFile?.fileKey ||
     this.audioFile?.fileKey ||
     this.fileKey;
-  return fileKey ? `${process.env.S3_BASE_URL || ""}/${fileKey}` : undefined;
+  // Return GCS public URL - signed URLs will be generated when serving files
+  if (!fileKey) return undefined;
+  // Use GCS public URL format
+  const bucketName = process.env.GCS_BUCKET_NAME || "";
+  return bucketName
+    ? `https://storage.googleapis.com/${bucketName}/${fileKey}`
+    : undefined;
 });
 
 // Update lastModified before saving

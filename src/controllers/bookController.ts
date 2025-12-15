@@ -2,8 +2,8 @@ import { Request, Response } from "express";
 import { validationResult } from "express-validator";
 import multer from "multer";
 import path from "path";
-import fs from "fs";
 import crypto from "crypto";
+import fs from "fs";
 import {
   IBook,
   BookStatus,
@@ -18,27 +18,12 @@ import { EpubService } from "../services/epubService";
 import { getStorageService } from "../services/storageService";
 import { AutoNewsletterService } from "../services/autoNewsletterService";
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, "../../uploads/temp");
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(
-      null,
-      file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname)
-    );
-  },
-});
+// Use memory storage for all uploads (files will be uploaded directly to GCS)
+const memoryStorage = multer.memoryStorage();
 
 // Upload middleware for book/audio files
 const upload = multer({
-  storage,
+  storage: memoryStorage,
   limits: {
     fileSize: 100 * 1024 * 1024, // 100MB limit
   },
@@ -56,7 +41,7 @@ const upload = multer({
 
 // Upload middleware for cover images
 const uploadCover = multer({
-  storage,
+  storage: memoryStorage,
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit for images
   },
@@ -167,6 +152,7 @@ export class BookController {
    */
   static async uploadBook(req: AuthRequest, res: Response): Promise<void> {
     let detectedFileType: BookFileType | undefined;
+    let tempFilePath: string | null = null;
 
     try {
       const validationErrors = validationResult(req);
@@ -225,16 +211,36 @@ export class BookController {
         return;
       }
 
+      // Get file buffer from memory storage
+      const fileBuffer = req.file.buffer;
+      if (!fileBuffer) {
+        res.status(400).json({
+          success: false,
+          message: "File buffer is missing",
+        } as ApiResponse);
+        return;
+      }
+
       let fileValidationResult: any;
       let processingResult: any;
 
-      // Validate and process based on file type
+      // For EPUB files, we need to write to temp file for processing
       if (detectedFileType === BookFileType.EPUB) {
+        // Create temporary file for EPUB processing
+        const os = require("os");
+        tempFilePath = path.join(
+          os.tmpdir(),
+          `epub-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.epub`
+        );
+        fs.writeFileSync(tempFilePath, fileBuffer);
+
         console.log("Validating EPUB file...");
-        fileValidationResult = await EpubService.validateEpub(req.file.path);
+        fileValidationResult = await EpubService.validateEpub(tempFilePath);
 
         if (!fileValidationResult.isValid) {
-          await EpubService.cleanupTempFile(req.file.path);
+          if (tempFilePath && fs.existsSync(tempFilePath)) {
+            fs.unlinkSync(tempFilePath);
+          }
           res.status(400).json({
             success: false,
             message: "Invalid EPUB file",
@@ -245,7 +251,7 @@ export class BookController {
 
         console.log("EPUB validation successful, processing...");
         processingResult = await EpubService.processEpub(
-          req.file.path,
+          tempFilePath,
           fileValidationResult.metadata as any
         );
       } else if (detectedFileType === BookFileType.PDF) {
@@ -253,7 +259,7 @@ export class BookController {
         fileValidationResult = {
           isValid: true,
           fileSize: req.file.size,
-          checksum: await BookController.calculateChecksum(req.file.path),
+          checksum: await BookController.calculateChecksum(fileBuffer),
           metadata: {
             title: title,
             creator: author,
@@ -273,7 +279,7 @@ export class BookController {
         fileValidationResult = {
           isValid: true,
           fileSize: req.file.size,
-          checksum: await BookController.calculateChecksum(req.file.path),
+          checksum: await BookController.calculateChecksum(fileBuffer),
           metadata: {
             title: title,
             creator: author,
@@ -291,12 +297,16 @@ export class BookController {
       }
 
       // Upload to storage service
-      const fileBuffer = fs.readFileSync(req.file.path);
       const storageService = getStorageService();
+      const contentType =
+        req.file.mimetype ||
+        (detectedFileType === BookFileType.EPUB
+          ? EpubService.getEpubMimeType()
+          : "application/octet-stream");
       const uploadResult = await storageService.uploadFile(
         `books/${userId}/${Date.now()}-${req.file.originalname}`,
         fileBuffer,
-        EpubService.getEpubMimeType(),
+        contentType,
         {
           userId: userId.toString(),
           originalName: req.file.originalname,
@@ -373,13 +383,10 @@ export class BookController {
 
       await book.save();
 
-      // Clean up temp file
-      if (detectedFileType === BookFileType.EPUB) {
-        await EpubService.cleanupTempFile(req.file.path);
-      } else {
-        // For non-EPUB files, just delete the temp file
+      // Clean up temp file if created
+      if (tempFilePath && fs.existsSync(tempFilePath)) {
         try {
-          fs.unlinkSync(req.file.path);
+          fs.unlinkSync(tempFilePath);
         } catch (error) {
           console.error("Failed to delete temp file:", error);
         }
@@ -406,14 +413,10 @@ export class BookController {
     } catch (error) {
       console.error("Upload book error:", error);
 
-      // Clean up temp file if it exists
-      if (req.file?.path) {
+      // Clean up temp file if created
+      if (tempFilePath && fs.existsSync(tempFilePath)) {
         try {
-          if (detectedFileType === BookFileType.EPUB) {
-            await EpubService.cleanupTempFile(req.file.path);
-          } else if (detectedFileType) {
-            fs.unlinkSync(req.file.path);
-          }
+          fs.unlinkSync(tempFilePath);
         } catch (cleanupError) {
           console.error("Failed to cleanup temp file:", cleanupError);
         }
@@ -792,7 +795,15 @@ export class BookController {
       }
 
       // Upload new cover image to storage
-      const fileBuffer = fs.readFileSync(req.file.path);
+      const fileBuffer = req.file.buffer;
+      if (!fileBuffer) {
+        res.status(400).json({
+          success: false,
+          message: "File buffer is missing",
+        } as ApiResponse);
+        return;
+      }
+
       const storageService = getStorageService();
       const uploadResult = await storageService.uploadFile(
         `covers/${userId}/${Date.now()}-${req.file.originalname}`,
@@ -807,13 +818,6 @@ export class BookController {
       book.coverImageSize = req.file.size;
 
       await book.save();
-
-      // Clean up temp file
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (error) {
-        console.error("Failed to delete temp file:", error);
-      }
 
       res.status(200).json({
         success: true,
@@ -892,7 +896,15 @@ export class BookController {
       }
 
       // Upload file to storage
-      const fileBuffer = fs.readFileSync(req.file.path);
+      const fileBuffer = req.file.buffer;
+      if (!fileBuffer) {
+        res.status(400).json({
+          success: false,
+          message: "File buffer is missing",
+        } as ApiResponse);
+        return;
+      }
+
       const storageService = getStorageService();
       const uploadResult = await storageService.uploadFile(
         `books/${userId}/${Date.now()}-${req.file.originalname}`,
@@ -902,7 +914,7 @@ export class BookController {
       const fileKey = uploadResult.key;
 
       // Calculate checksum
-      const checksum = await BookController.calculateChecksum(req.file.path);
+      const checksum = await BookController.calculateChecksum(fileBuffer);
 
       // Create file object with all required fields
       const fileData = {
@@ -982,13 +994,6 @@ export class BookController {
 
       await book.save();
 
-      // Clean up temp file
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (error) {
-        console.error("Failed to delete temp file:", error);
-      }
-
       res.status(200).json({
         success: true,
         message: "Book updated with file successfully",
@@ -1051,7 +1056,15 @@ export class BookController {
       }
 
       // Upload to storage service
-      const fileBuffer = fs.readFileSync(req.file.path);
+      const fileBuffer = req.file.buffer;
+      if (!fileBuffer) {
+        res.status(400).json({
+          success: false,
+          message: "File buffer is missing",
+        } as ApiResponse);
+        return;
+      }
+
       const storageService = getStorageService();
       const uploadResult = await storageService.uploadFile(
         `audio/${userId}/${Date.now()}-${req.file.originalname}`,
@@ -1067,7 +1080,6 @@ export class BookController {
       // Delete old audio file from storage if it exists
       if (book.audioFile?.fileKey) {
         try {
-          const storageService = getStorageService();
           await storageService.deleteFile(book.audioFile.fileKey);
         } catch (error) {
           console.error("Failed to delete old audio file:", error);
@@ -1079,7 +1091,7 @@ export class BookController {
         fileKey: uploadResult.key,
         fileName: req.file.originalname,
         fileSize: req.file.size,
-        checksum: await BookController.calculateChecksum(req.file.path),
+        checksum: await BookController.calculateChecksum(fileBuffer),
         uploadedAt: new Date(),
       };
 
@@ -1088,9 +1100,6 @@ export class BookController {
       book.fileType = BookFileType.AUDIO;
 
       await book.save();
-
-      // Clean up temporary file
-      fs.unlinkSync(req.file.path);
 
       res.status(200).json({
         success: true,
@@ -1102,10 +1111,7 @@ export class BookController {
     } catch (error) {
       console.error("Error uploading audio file:", error);
 
-      // Clean up temporary file if it exists
-      if (req.file?.path && fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
-      }
+      // No cleanup needed for memory storage
 
       res.status(500).json({
         success: false,
@@ -1229,17 +1235,27 @@ export class BookController {
   }
 
   /**
-   * Calculate SHA-256 checksum for a file
+   * Calculate SHA-256 checksum for a file or buffer
    */
-  private static async calculateChecksum(filePath: string): Promise<string> {
-    return new Promise((resolve, reject) => {
+  private static async calculateChecksum(
+    filePathOrBuffer: string | Buffer
+  ): Promise<string> {
+    if (Buffer.isBuffer(filePathOrBuffer)) {
+      // Calculate checksum from buffer
       const hash = crypto.createHash("sha256");
-      const stream = fs.createReadStream(filePath);
+      hash.update(filePathOrBuffer);
+      return hash.digest("hex");
+    } else {
+      // Calculate checksum from file path (legacy support)
+      return new Promise((resolve, reject) => {
+        const hash = crypto.createHash("sha256");
+        const stream = fs.createReadStream(filePathOrBuffer);
 
-      stream.on("data", (data) => hash.update(data));
-      stream.on("end", () => resolve(hash.digest("hex")));
-      stream.on("error", reject);
-    });
+        stream.on("data", (data: string | Buffer) => hash.update(data));
+        stream.on("end", () => resolve(hash.digest("hex")));
+        stream.on("error", reject);
+      });
+    }
   }
 
   /**

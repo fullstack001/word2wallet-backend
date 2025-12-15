@@ -1,9 +1,4 @@
-import {
-  LocalStorageService,
-  getLocalStorageService,
-} from "./localStorageService";
-
-export type StorageProvider = "local";
+import { GCSStorageService, getGCSStorageService } from "./gcsStorageService";
 
 export interface StorageService {
   uploadFile(
@@ -58,12 +53,12 @@ let storageServiceInstance: StorageService | null = null;
 
 export const getStorageService = (): StorageService => {
   if (!storageServiceInstance) {
-    storageServiceInstance = getLocalStorageService();
-    console.log("Using local storage service");
+    storageServiceInstance = getGCSStorageService();
+    console.log("Using Google Cloud Storage service");
   }
 
   return storageServiceInstance;
 };
 
 // Export individual services for direct access if needed
-export { LocalStorageService };
+export { GCSStorageService };

@@ -3,58 +3,8 @@ import path from "path";
 import { Request } from "express";
 import { CustomError } from "./errorHandler";
 
-// Configure storage for EPUB files
-const epubStorage = multer.diskStorage({
-  destination: (req: Request, file, cb) => {
-    const uploadPath = process.env.EPUB_UPLOAD_PATH || "./uploads/epubs";
-    cb(null, uploadPath);
-  },
-  filename: (req: Request, file, cb) => {
-    // Generate unique filename with timestamp
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const filename = `epub-${uniqueSuffix}${path.extname(file.originalname)}`;
-    cb(null, filename);
-  },
-});
-
-// Configure storage for thumbnails/covers
-const thumbnailStorage = multer.diskStorage({
-  destination: (req: Request, file, cb) => {
-    const uploadPath = process.env.UPLOAD_PATH || "./uploads";
-    cb(null, path.join(uploadPath, "covers"));
-  },
-  filename: (req: Request, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const filename = `cover-${uniqueSuffix}${path.extname(file.originalname)}`;
-    cb(null, filename);
-  },
-});
-
-// Configure storage for audio files
-const audioStorage = multer.diskStorage({
-  destination: (req: Request, file, cb) => {
-    const uploadPath = process.env.UPLOAD_PATH || "./uploads";
-    cb(null, path.join(uploadPath, "audio"));
-  },
-  filename: (req: Request, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const filename = `audio-${uniqueSuffix}${path.extname(file.originalname)}`;
-    cb(null, filename);
-  },
-});
-
-// Configure storage for video files
-const videoStorage = multer.diskStorage({
-  destination: (req: Request, file, cb) => {
-    const uploadPath = process.env.UPLOAD_PATH || "./uploads";
-    cb(null, path.join(uploadPath, "video"));
-  },
-  filename: (req: Request, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const filename = `video-${uniqueSuffix}${path.extname(file.originalname)}`;
-    cb(null, filename);
-  },
-});
+// Use memory storage for all uploads (files will be uploaded directly to GCS)
+const memoryStorage = multer.memoryStorage();
 
 // File filter for EPUB files
 const epubFileFilter = (
@@ -176,7 +126,7 @@ const videoFileFilter = (
 
 // Legacy upload configurations (kept for backward compatibility)
 export const uploadEpub = multer({
-  storage: epubStorage,
+  storage: memoryStorage,
   fileFilter: epubFileFilter,
   limits: {
     fileSize: 100 * 1024 * 1024, // 100MB limit
@@ -185,7 +135,7 @@ export const uploadEpub = multer({
 });
 
 export const uploadThumbnail = multer({
-  storage: thumbnailStorage,
+  storage: memoryStorage,
   fileFilter: imageFileFilter,
   limits: {
     fileSize: 100 * 1024 * 1024, // 100MB limit
@@ -194,7 +144,7 @@ export const uploadThumbnail = multer({
 });
 
 export const uploadAudio = multer({
-  storage: audioStorage,
+  storage: memoryStorage,
   fileFilter: audioFileFilter,
   limits: {
     fileSize: 100 * 1024 * 1024, // 100MB limit
@@ -203,7 +153,7 @@ export const uploadAudio = multer({
 });
 
 export const uploadVideo = multer({
-  storage: videoStorage,
+  storage: memoryStorage,
   fileFilter: videoFileFilter,
   limits: {
     fileSize: 100 * 1024 * 1024, // 100MB limit
@@ -213,30 +163,7 @@ export const uploadVideo = multer({
 
 // Configure multer for course creation with all file types
 export const uploadCourseContent = multer({
-  storage: multer.diskStorage({
-    destination: (req: Request, file, cb) => {
-      const uploadPath = process.env.UPLOAD_PATH || "./uploads";
-      let subPath = "";
-
-      // Determine subdirectory based on fieldname
-      if (file.fieldname === "cover") {
-        subPath = "covers";
-      } else if (file.fieldname === "audio") {
-        subPath = "audio";
-      } else if (file.fieldname === "video") {
-        subPath = "video";
-      }
-
-      cb(null, path.join(uploadPath, subPath));
-    },
-    filename: (req: Request, file, cb) => {
-      const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-      const filename = `${file.fieldname}-${uniqueSuffix}${path.extname(
-        file.originalname
-      )}`;
-      cb(null, filename);
-    },
-  }),
+  storage: memoryStorage,
   fileFilter: (
     req: Request,
     file: Express.Multer.File,
@@ -280,19 +207,7 @@ export const uploadCourseContent = multer({
 
 // Configure multer for multiple file types (legacy)
 export const uploadMultiple = multer({
-  storage: multer.diskStorage({
-    destination: (req: Request, file, cb) => {
-      const uploadPath = process.env.UPLOAD_PATH || "./uploads";
-      cb(null, uploadPath);
-    },
-    filename: (req: Request, file, cb) => {
-      const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-      const filename = `${file.fieldname}-${uniqueSuffix}${path.extname(
-        file.originalname
-      )}`;
-      cb(null, filename);
-    },
-  }),
+  storage: memoryStorage,
   fileFilter: (
     req: Request,
     file: Express.Multer.File,
@@ -317,20 +232,6 @@ export const uploadMultiple = multer({
   limits: {
     fileSize: 100 * 1024 * 1024, // 100MB limit
     files: 2, // Maximum 2 files
-  },
-});
-
-// Configure storage for media files (images, audio, video)
-const mediaStorage = multer.diskStorage({
-  destination: (req: Request, file, cb) => {
-    const uploadPath = process.env.UPLOAD_PATH || "./uploads";
-    const tempDir = path.join(uploadPath, "temp");
-    cb(null, tempDir);
-  },
-  filename: (req: Request, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const filename = `media-${uniqueSuffix}${path.extname(file.originalname)}`;
-    cb(null, filename);
   },
 });
 
@@ -379,7 +280,7 @@ const mediaFileFilter = (
 };
 
 export const uploadMedia = multer({
-  storage: mediaStorage,
+  storage: memoryStorage,
   fileFilter: mediaFileFilter,
   limits: {
     fileSize: 100 * 1024 * 1024, // 100MB limit

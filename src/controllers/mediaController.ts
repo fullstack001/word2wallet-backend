@@ -177,9 +177,9 @@ export class MediaController {
       let height: number | undefined;
       let duration: number | undefined;
 
-      if (mediaType === MediaType.IMAGE) {
+      if (mediaType === MediaType.IMAGE && file.buffer) {
         try {
-          const metadata = await sharp(file.path).metadata();
+          const metadata = await sharp(file.buffer).metadata();
           width = metadata.width;
           height = metadata.height;
         } catch (error) {
@@ -189,21 +189,30 @@ export class MediaController {
 
       // Upload to storage service
       const storageService = getStorageService();
-      const fileBuffer = await fs.readFile(file.path);
+      const fileBuffer = file.buffer;
+      if (!fileBuffer) {
+        return res.status(400).json({
+          success: false,
+          message: "File buffer is missing",
+        });
+      }
+
       const fileName = `media-${Date.now()}-${Math.round(
         Math.random() * 1e9
       )}${path.extname(file.originalname)}`;
 
-      await storageService.uploadFile(fileName, fileBuffer, file.mimetype, {
-        originalName: file.originalname,
-        uploadedAt: new Date().toISOString(),
-      });
+      const uploadResult = await storageService.uploadFile(
+        fileName,
+        fileBuffer,
+        file.mimetype,
+        {
+          originalName: file.originalname,
+          uploadedAt: new Date().toISOString(),
+        }
+      );
 
-      const publicUrl = `${process.env.BASE_URL}/${fileName}`;
+      const publicUrl = uploadResult.url;
       console.log("publicUrl", publicUrl);
-
-      // Clean up temporary file
-      await fs.unlink(file.path).catch(() => {});
 
       // Create media record
       const media = await Media.create({
@@ -290,13 +299,18 @@ export class MediaController {
         Math.random() * 1e9
       )}.png`;
 
-      await storageService.uploadFile(fileName, imageBuffer, "image/png", {
-        generatedBy: "dall-e-3",
-        prompt: prompt,
-        uploadedAt: new Date().toISOString(),
-      });
+      const uploadResult = await storageService.uploadFile(
+        fileName,
+        imageBuffer,
+        "image/png",
+        {
+          generatedBy: "dall-e-3",
+          prompt: prompt,
+          uploadedAt: new Date().toISOString(),
+        }
+      );
 
-      const publicUrl = `${process.env.BASE_URL}/${fileName}`;
+      const publicUrl = uploadResult.url;
       console.log("publicUrl", publicUrl);
 
       // Extract image dimensions
@@ -317,7 +331,7 @@ export class MediaController {
         type: MediaType.IMAGE,
         source: MediaSource.GENERATED,
         fileName,
-        filePath: fileName,
+        filePath: uploadResult.key,
         publicUrl,
         mimeType: "image/png",
         size: imageBuffer.length,
@@ -395,13 +409,18 @@ export class MediaController {
         Math.random() * 1e9
       )}.mp3`;
 
-      await storageService.uploadFile(fileName, audioBuffer, "audio/mpeg", {
-        generatedBy: "openai-tts",
-        text: text.substring(0, 100),
-        uploadedAt: new Date().toISOString(),
-      });
+      const uploadResult = await storageService.uploadFile(
+        fileName,
+        audioBuffer,
+        "audio/mpeg",
+        {
+          generatedBy: "openai-tts",
+          text: text.substring(0, 100),
+          uploadedAt: new Date().toISOString(),
+        }
+      );
 
-      const publicUrl = `${process.env.BASE_URL}/${fileName}`;
+      const publicUrl = uploadResult.url;
       console.log("publicUrl", publicUrl);
 
       // Create media record
@@ -411,7 +430,7 @@ export class MediaController {
         type: MediaType.AUDIO,
         source: MediaSource.GENERATED,
         fileName,
-        filePath: fileName,
+        filePath: uploadResult.key,
         publicUrl,
         mimeType: "audio/mpeg",
         size: audioBuffer.length,

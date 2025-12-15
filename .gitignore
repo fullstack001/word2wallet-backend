@@ -178,6 +178,15 @@ logs
 # Uploads directory
 uploads/
 
+# Google Cloud Storage credentials
+config/gcs-key.json
+*.gcs-key.json
+gcs-key.json
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+
 # IDE files
 .vscode/
 .idea/

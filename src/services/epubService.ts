@@ -237,7 +237,7 @@ export class EpubService {
   }
 
   /**
-   * Generate unique file key for S3 storage
+   * Generate unique file key for GCS storage
    */
   static generateFileKey(userId: string, fileName: string): string {
     const timestamp = Date.now();
