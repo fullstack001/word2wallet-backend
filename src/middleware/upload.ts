@@ -171,6 +171,7 @@ export const uploadCourseContent = multer({
   ) => {
     const allowedMimes: { [key: string]: string[] } = {
       cover: ["image/jpeg", "image/jpg", "image/png", "image/webp"],
+      epubCover: ["image/jpeg", "image/jpg", "image/png", "image/webp"],
       audio: [
         "audio/mpeg",
         "audio/mp3",

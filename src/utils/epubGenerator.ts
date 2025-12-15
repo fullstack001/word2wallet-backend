@@ -22,12 +22,16 @@ export class EpubGenerator {
     const outputDir = path.dirname(outputPath);
     if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
+    // Use ONE UUID across OPF + NCX (important for some readers)
+    const bookUuid = this.generateUUID();
+
     const epubContent = this.createEpubStructure({
       title,
       description,
       author,
       coverImagePath,
       chapters,
+      uuid: bookUuid,
     });
 
     await this.writeEpubFile(epubContent, outputPath, coverImagePath);
@@ -44,8 +48,10 @@ export class EpubGenerator {
     author: string;
     coverImagePath?: string;
     chapters: IChapter[];
+    uuid: string;
   }) {
-    const { title, description, author, coverImagePath, chapters } = options;
+    const { title, description, author, coverImagePath, chapters, uuid } =
+      options;
 
     const mimetype = "application/epub+zip";
 
@@ -62,13 +68,13 @@ export class EpubGenerator {
       author,
       coverImagePath,
       chapters,
+      uuid,
     });
 
-    const tocNcx = this.createTocNcx({ title, chapters }); // optional (back-compat)
-    const navXhtml = this.createNavXhtml({ title, chapters });
+    const tocNcx = this.createTocNcx({ title, chapters, uuid }); // NCX for back-compat + TOC pane
+    const navXhtml = this.createNavXhtml({ title, chapters }); // EPUB 3 nav document
 
     const styleCss = this.createStyleCss();
-
     const chapterFiles = this.createChapterFiles(chapters);
 
     return {
@@ -91,15 +97,21 @@ export class EpubGenerator {
     author: string;
     coverImagePath?: string;
     chapters: IChapter[];
+    uuid: string;
   }) {
-    const { title, description, author, coverImagePath, chapters } = options;
-    const uuid = this.generateUUID();
+    const { title, description, author, coverImagePath, chapters, uuid } =
+      options;
 
-    let manifestItems = `    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>\n`;
-    manifestItems += `    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>\n`;
-    manifestItems += `    <item id="css" href="style.css" media-type="text/css"/>\n`;
+    // Match pattern of your working code:
+    // - NCX item id="toc"
+    // - spine toc="toc"
+    let manifestItems =
+      `    <item id="toc" href="toc.ncx" media-type="application/x-dtbncx+xml"/>\n` +
+      `    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>\n` +
+      `    <item id="css" href="style.css" media-type="text/css"/>\n`;
 
-    let spineItems = "";
+    // Keep nav doc discoverable even if not linear reading order
+    let spineItems = `    <itemref idref="nav" linear="no"/>\n`;
 
     // Optional cover image
     if (coverImagePath && fs.existsSync(coverImagePath)) {
@@ -116,16 +128,16 @@ export class EpubGenerator {
       manifestItems += `    <item id="cover-image" href="images/${coverImageName}" media-type="${mimeType}" properties="cover-image"/>\n`;
     }
 
-    // Chapters
+    // Chapters (use chapterN pattern like your working code)
     chapters.forEach((_, index) => {
-      const id = `chapter-${index + 1}`;
-      const file = `chapter-${index + 1}.xhtml`;
+      const id = `chapter${index + 1}`;
+      const file = `chapter${index + 1}.xhtml`;
       manifestItems += `    <item id="${id}" href="${file}" media-type="application/xhtml+xml"/>\n`;
       spineItems += `    <itemref idref="${id}"/>\n`;
     });
 
     return `<?xml version="1.0" encoding="UTF-8"?>
-<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="BookId" version="3.0">
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="BookId" version="3.0" xml:lang="en">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
     <dc:identifier id="BookId">urn:uuid:${uuid}</dc:identifier>
     <dc:title>${this.escapeText(title)}</dc:title>
@@ -136,28 +148,33 @@ export class EpubGenerator {
   </metadata>
   <manifest>
 ${manifestItems}  </manifest>
-  <spine>
+  <spine toc="toc">
 ${spineItems}  </spine>
+  <guide>
+    <reference type="toc" title="Table of Contents" href="nav.xhtml" />
+  </guide>
 </package>`;
   }
 
   /**
-   * toc.ncx (optional for back-compat)
+   * toc.ncx (optional for back-compat + many readers' TOC panel)
    */
   private static createTocNcx(options: {
     title: string;
     chapters: IChapter[];
+    uuid: string;
   }) {
-    const { title, chapters } = options;
-    const uuid = this.generateUUID();
+    const { title, chapters, uuid } = options;
+    const bookId = `urn:uuid:${uuid}`;
 
     let navPoints = "";
     chapters.forEach((chapter, index) => {
-      navPoints += `    <navPoint id="chap${index + 1}" playOrder="${
-        index + 1
-      }">
+      const playOrder = index + 1;
+      const file = `chapter${index + 1}.xhtml`;
+
+      navPoints += `    <navPoint id="navpoint-${playOrder}" playOrder="${playOrder}">
       <navLabel><text>${this.escapeText(chapter.title)}</text></navLabel>
-      <content src="chapter-${index + 1}.xhtml"/>
+      <content src="${file}"/>
     </navPoint>
 `;
     });
@@ -165,7 +182,7 @@ ${spineItems}  </spine>
     return `<?xml version="1.0" encoding="UTF-8"?>
 <ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
   <head>
-    <meta name="dtb:uid" content="urn:uuid:${uuid}"/>
+    <meta name="dtb:uid" content="${bookId}"/>
     <meta name="dtb:depth" content="1"/>
     <meta name="dtb:totalPageCount" content="0"/>
     <meta name="dtb:maxPageNumber" content="0"/>
@@ -187,7 +204,7 @@ ${navPoints}  </navMap>
     const items = chapters
       .map(
         (c, i) =>
-          `<li><a href="chapter-${i + 1}.xhtml">${this.escapeText(
+          `<li><a href="chapter${i + 1}.xhtml">${this.escapeText(
             c.title
           )}</a></li>`
       )
@@ -195,14 +212,14 @@ ${navPoints}  </navMap>
 
     return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="en" lang="en">
 <head>
   <meta charset="utf-8" />
   <title>${this.escapeText(title)}</title>
   <link rel="stylesheet" type="text/css" href="style.css" />
 </head>
 <body>
-  <nav epub:type="toc" id="toc">
+  <nav epub:type="toc" id="toc" role="doc-toc">
     <h1>${this.escapeText(title)}</h1>
     <ol>
       ${items}
@@ -239,7 +256,7 @@ th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }`;
 
     chapters.forEach((chapter, index) => {
       const chapterNumber = index + 1;
-      const filename = `OEBPS/chapter-${chapterNumber}.xhtml`;
+      const filename = `OEBPS/chapter${chapterNumber}.xhtml`;
 
       // Normalize raw fragment into strict XHTML-safe markup
       const normalized = this.normalizeXhtmlFragment(chapter.content || "");
@@ -382,18 +399,13 @@ ${normalized}
       "wbr",
     ];
     for (const tag of voidTags) {
-      // <tag ...>  (not followed by / or > already closed)
       const re = new RegExp(`<${tag}(\\s[^>]*)?>`, "gi");
       out = out.replace(re, (m) =>
         m.endsWith("/>") ? m : m.replace(/>$/, " />")
       );
     }
 
-    // Ensure <source> always has /> (covered above) and keep attributes
     // Remove duplicate stray </p> tags produced by editors
-    out = out.replace(/<\/p>\s*<\/p>/gi, "</p>");
-
-    // Common broken pattern: <p> ... </p></p>  -> </p>
     out = out.replace(/<\/p>\s*<\/p>/gi, "</p>");
 
     // Remove empty paragraphs introduced by cleanups: <p>\s*</p>
